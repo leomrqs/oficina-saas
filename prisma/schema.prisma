@@ -64,19 +64,31 @@ model User {
 }
 
 model Customer {
-  id        String   @id @default(cuid())
-  name      String
-  document  String?  @unique // CPF ou CNPJ
-  phone     String?
+  id           String   @id @default(cuid())
+  name         String
+  document     String?  @unique // CPF ou CNPJ
+  phone        String?
+  email        String?  // Novo
   
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // Endereço (Novos)
+  cep          String?
+  street       String?
+  number       String?
+  complement   String?
+  neighborhood String?
+  city         String?
+  state        String?
 
-  vehicles  Vehicle[]
-  orders    Order[]
+  notes        String?  @db.Text // Observações internas
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  vehicles     Vehicle[]
+  orders       Order[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@map("customers")
 }
