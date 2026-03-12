@@ -3,19 +3,29 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Wrench, LayoutDashboard, Users, Package, FileText, DollarSign, Settings } from "lucide-react";
+import { Wrench, LayoutDashboard, Users, Package, FileText, DollarSign, Settings, Building } from "lucide-react";
 
-const navItems = [
-  { name: "Painel", href: "/dashboard", icon: LayoutDashboard },
+// Links do Cliente (Oficina)
+const managerItems = [
+  { name: "Painel da Oficina", href: "/dashboard", icon: LayoutDashboard },
   { name: "Clientes & Veículos", href: "/dashboard/clientes", icon: Users },
   { name: "Estoque", href: "/dashboard/estoque", icon: Package },
   { name: "Orçamentos & OS", href: "/dashboard/os", icon: FileText },
   { name: "Financeiro", href: "/dashboard/financeiro", icon: DollarSign },
-  { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
 ];
 
-export function Sidebar() {
+// Links Seus (Dono do SaaS)
+const superAdminItems = [
+  { name: "Visão Geral SaaS", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Gestão de Oficinas", href: "/dashboard/oficinas", icon: Building },
+  { name: "Faturamento SaaS", href: "/dashboard/faturamento", icon: DollarSign },
+];
+
+export function Sidebar({ role }: { role?: string }) {
   const pathname = usePathname();
+  
+  // Decide qual lista de links mostrar
+  const navItems = role === "SUPER_ADMIN" ? superAdminItems : managerItems;
 
   return (
     <nav className="grid items-start px-2 text-sm font-medium lg:px-4 space-y-1">

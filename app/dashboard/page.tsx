@@ -2,15 +2,44 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, FileText, Wrench, AlertTriangle } from "lucide-react";
+import { DollarSign, FileText, Wrench, AlertTriangle, Building } from "lucide-react";
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions);
+  
+  // Verifica se quem está logado é você (SaaS) ou o cliente (Manager)
+  const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
 
+  // -----------------------------------------------------------------
+  // VISÃO DO DONO DO SAAS (VOCÊ) - Para controle futuro
+  // -----------------------------------------------------------------
+  if (isSuperAdmin) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-3xl font-bold tracking-tight">Painel Administrativo SaaS</h2>
+        <Card className="bg-zinc-900 text-white transition-all duration-300 hover:shadow-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building className="h-5 w-5" /> Visão Global do Sistema
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-zinc-400">
+              Este painel será desenvolvido futuramente para gerenciar as assinaturas, visualizar o faturamento global do SaaS e administrar as oficinas cadastradas.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // -----------------------------------------------------------------
+  // VISÃO DO CLIENTE (GERENTE DA OFICINA) - Foco da apresentação
+  // -----------------------------------------------------------------
   return (
     <>
       <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Visão Geral</h2>
+        <h2 className="text-3xl font-bold tracking-tight">Visão Geral da Oficina</h2>
       </div>
 
       {/* CARDS DE RESUMO */}

@@ -1,10 +1,11 @@
 // app/dashboard/layout.tsx
 import { ReactNode } from "react";
 import Link from "next/link";
-import { Menu, Wrench, CircleUser } from "lucide-react";
+import { Menu, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
@@ -14,17 +15,22 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[260px_1fr]">
       {/* SIDEBAR DESKTOP */}
-      <div className="hidden border-r bg-zinc-50/50 md:block">
-        <div className="flex h-full max-h-screen flex-col gap-2">
-          <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-            <Link href="/" className="flex items-center gap-2 font-semibold">
-              <Wrench className="h-6 w-6" />
-              <span className="">Oficina SaaS</span>
-            </Link>
-          </div>
-          <div className="flex-1 overflow-auto py-2">
-            <Sidebar />
-          </div>
+      <div className="hidden border-r bg-zinc-50/50 md:flex flex-col">
+        <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
+          <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+            <Wrench className="h-6 w-6" />
+            <span className="">Oficina SaaS</span>
+          </Link>
+        </div>
+        
+        <div className="flex-1 overflow-auto py-4">
+          <Sidebar role={session?.user?.role} />
+        </div>
+
+        {/* HUD DO USUÁRIO NO RODAPÉ */}
+        <div className="mt-auto border-t p-2">
+          {/* Usamos o as any para o TypeScript não reclamar da tipagem flexível do user */}
+          <UserMenu user={session?.user as any} /> 
         </div>
       </div>
 
@@ -38,28 +44,26 @@ export default async function DashboardLayout({ children }: { children: ReactNod
                 <span className="sr-only">Abrir menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="flex flex-col">
+            <SheetContent side="left" className="flex flex-col h-full">
               <SheetTitle className="flex items-center gap-2 font-semibold mb-4">
                 <Wrench className="h-6 w-6" />
                 Oficina SaaS
               </SheetTitle>
-              <Sidebar />
+              
+              <div className="flex-1 overflow-auto">
+                <Sidebar role={session?.user?.role} />
+              </div>
+
+              {/* HUD DO USUÁRIO NO RODAPÉ MOBILE */}
+              <div className="mt-auto border-t pt-4">
+                <UserMenu user={session?.user as any} />
+              </div>
             </SheetContent>
           </Sheet>
 
           <div className="w-full flex-1" /> {/* Espaçador */}
-
-          {/* PERFIL DO USUÁRIO */}
-          <div className="flex items-center gap-4">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium leading-none">{session?.user?.name}</p>
-              <p className="text-xs text-zinc-500 mt-1">{session?.user?.role}</p>
-            </div>
-            <Button variant="secondary" size="icon" className="rounded-full">
-              <CircleUser className="h-5 w-5" />
-              <span className="sr-only">Menu do usuário</span>
-            </Button>
-          </div>
+          
+          {/* Note que removemos o perfil do usuário daqui. O Header agora fica livre e limpo! */}
         </header>
 
         {/* ÁREA DE CONTEÚDO (Onde as páginas entram) */}
