@@ -21,7 +21,7 @@ export async function createOrder(data: any) {
       partsTotal: data.partsTotal,
       discount: data.discount,
       total: data.total,
-      status: "PENDING", // Nasce sempre como Orçamento
+      status: "PENDING",
       tenantId: session.user.tenantId,
       items: {
         create: data.items.map((item: any) => ({
@@ -45,14 +45,48 @@ export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | 
   const session = await getServerSession(authOptions);
   if (!session?.user?.tenantId) throw new Error("Não autorizado");
 
-  // TODO: Quando status for COMPLETED, dar baixa no estoque dos itens (Faremos depois da apresentação)
+  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!order) throw new Error("OS não encontrada");
 
-  await prisma.order.update({
-    where: { id: orderId, tenantId: session.user.tenantId },
-    data: { status: newStatus },
+  await prisma.$transaction(async (tx) => {
+    // 1. Atualiza o status da OS
+    await tx.order.update({
+      where: { id: orderId, tenantId: session.user.tenantId },
+      data: { status: newStatus },
+    });
+
+    // 2. INTEGRAÇÃO FINANCEIRA AUTOMÁTICA
+    if (newStatus === "COMPLETED") {
+      // Se finalizou, joga pro Caixa como Receita Paga
+      const existingTx = await tx.financialTransaction.findFirst({
+        where: { orderId: orderId, tenantId: session.user.tenantId }
+      });
+      
+      if (!existingTx) {
+        await tx.financialTransaction.create({
+          data: {
+            title: `Recebimento OS #${order.number}`,
+            type: "INCOME",
+            category: "Serviços Realizados",
+            amount: order.total,
+            status: "PAID",
+            dueDate: new Date(),
+            paymentDate: new Date(),
+            orderId: order.id,
+            tenantId: session.user.tenantId,
+          }
+        });
+      }
+    } else {
+      // Se voltou pra orçamento ou cancelou, remove do Caixa (se existir)
+      await tx.financialTransaction.deleteMany({
+        where: { orderId: orderId, tenantId: session.user.tenantId }
+      });
+    }
   });
 
   revalidatePath("/dashboard/os");
+  revalidatePath("/dashboard/financeiro");
 }
 
 export async function deleteOrder(orderId: string) {
