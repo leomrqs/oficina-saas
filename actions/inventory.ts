@@ -14,7 +14,7 @@ export async function createProduct(formData: FormData) {
   const sku = formData.get("sku") as string;
   const category = formData.get("category") as string;
   const location = formData.get("location") as string;
-  const imageUrl = formData.get("imageUrl") as string; // Para a apresentação de amanhã, aceitaremos uma URL simples se o Uploadthing não estiver com as chaves configuradas.
+  const imageUrl = formData.get("imageUrl") as string;
   const costPrice = parseFloat(formData.get("costPrice") as string);
   const sellingPrice = parseFloat(formData.get("sellingPrice") as string);
   const minStock = parseInt(formData.get("minStock") as string);
@@ -51,18 +51,51 @@ export async function adjustStock(formData: FormData) {
   const reason = formData.get("reason") as string;
 
   await prisma.$transaction(async (tx) => {
-    // 1. Registra no histórico
     await tx.inventoryTransaction.create({
       data: {
         productId, type, quantity, reason, tenantId: session.user.tenantId,
       },
     });
 
-    // 2. Atualiza o saldo do produto
     await tx.product.update({
       where: { id: productId },
       data: {
         stock: type === "IN" ? { increment: quantity } : { decrement: quantity },
+      },
+    });
+  });
+
+  revalidatePath("/dashboard/estoque");
+}
+
+export async function updateProduct(formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.tenantId) throw new Error("Não autorizado");
+
+  const id = formData.get("id") as string;
+  const name = formData.get("name") as string;
+  const sku = formData.get("sku") as string;
+  const category = formData.get("category") as string;
+  const imageUrl = formData.get("imageUrl") as string;
+  const costPrice = parseFloat(formData.get("costPrice") as string);
+  const sellingPrice = parseFloat(formData.get("sellingPrice") as string);
+  const minStock = parseInt(formData.get("minStock") as string);
+
+  await prisma.$transaction(async (tx) => {
+    // 1. Atualiza os dados da peça
+    await tx.product.update({
+      where: { id, tenantId: session.user.tenantId },
+      data: { name, sku, category, imageUrl, costPrice, sellingPrice, minStock },
+    });
+
+    // 2. Registra no log do histórico (quantidade 0, pois é só edição de dados)
+    await tx.inventoryTransaction.create({
+      data: {
+        type: "EDIT", 
+        quantity: 0, 
+        reason: "Atualização de dados cadastrais da peça",
+        productId: id, 
+        tenantId: session.user.tenantId,
       },
     });
   });

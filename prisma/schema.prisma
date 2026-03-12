@@ -24,25 +24,38 @@ enum OrderStatus {
 enum TransactionType {
   IN
   OUT
+  EDIT
 } 
+
+enum FinancialType {
+  INCOME  // Receita (Entrada)
+  EXPENSE // Despesa (Saída)
+}
+
+enum FinancialStatus {
+  PENDING // Pendente (A Receber / A Pagar)
+  PAID    // Pago / Recebido
+}
 
 // -----------------------------------------------------------------------------
 // MODELS
 // -----------------------------------------------------------------------------
 
 model Tenant {
-  id        String   @id @default(cuid())
-  name      String
-  cnpj      String?  @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  cnpj         String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  users     User[]
-  customers Customer[]
-  vehicles  Vehicle[]
-  orders    Order[]
-  products      Product[]
-  transactions  InventoryTransaction[]
+  users        User[]
+  customers    Customer[]
+  vehicles     Vehicle[]
+  orders       Order[]
+  products     Product[]
+  transactions InventoryTransaction[]
+  orderItems   OrderItem[]
+  financials   FinancialTransaction[]
 
   @@map("tenants")
 }
@@ -114,27 +127,6 @@ model Vehicle {
   @@map("vehicles")
 }
 
-model Order {
-  id         String      @id @default(cuid())
-  status     OrderStatus @default(PENDING)
-  total      Float       @default(0.0)
-  notes      String?     @db.Text
-  
-  customerId String
-  customer   Customer    @relation(fields: [customerId], references: [id])
-
-  vehicleId  String
-  vehicle    Vehicle     @relation(fields: [vehicleId], references: [id])
-
-  tenantId   String
-  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-
-  @@map("orders")
-}
-
 model Product {
   id           String   @id @default(cuid())
   name         String
@@ -153,6 +145,7 @@ model Product {
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   transactions InventoryTransaction[]
+  orderItems   OrderItem[]
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -175,4 +168,82 @@ model InventoryTransaction {
   createdAt DateTime        @default(now())
 
   @@map("inventory_transactions")
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  number     Int         @default(autoincrement()) // Número sequencial da OS (Ex: #1001)
+  status     OrderStatus @default(PENDING) // PENDING = Orçamento, APPROVED = Em serviço, COMPLETED = Pago
+  
+  laborTotal Float       @default(0.0) // Total de mão de obra
+  partsTotal Float       @default(0.0) // Total de peças
+  discount   Float       @default(0.0) // Desconto concedido
+  total      Float       @default(0.0) // Valor final
+  
+  mileage    String?     // Quilometragem (KM) - Importante para garantia de escapamento
+  problem    String?     @db.Text // Reclamação do cliente
+  notes      String?     @db.Text // Obs internas / Diagnóstico do mecânico
+  
+  customerId String
+  customer   Customer    @relation(fields: [customerId], references: [id])
+
+  vehicleId  String
+  vehicle    Vehicle     @relation(fields: [vehicleId], references: [id])
+
+  tenantId   String
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  items      OrderItem[]
+  financials   FinancialTransaction[]
+
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  name       String   // Nome da peça ou serviço (Ex: "Solda MIG" ou "Abraçadeira 2.5")
+  isLabor    Boolean  @default(false) // True = Serviço (Não baixa estoque), False = Peça
+  
+  quantity   Int      @default(1)
+  unitPrice  Float
+  total      Float
+  
+  productId  String?  // Se for uma peça do estoque, liga aqui
+  product    Product? @relation(fields: [productId], references: [id])
+  
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+model FinancialTransaction {
+  id          String   @id @default(cuid())
+  title       String   // Ex: "Conta de Luz", "OS #1001", "Compra Fornecedor X"
+  type        FinancialType
+  category    String   // Ex: "Impostos", "Fornecedores", "Receitas Operacionais"
+  amount      Float
+  status      FinancialStatus @default(PENDING)
+  
+  dueDate     DateTime // Data de vencimento
+  paymentDate DateTime? // Data em que foi efetivamente pago/recebido
+  
+  notes       String?  @db.Text
+
+  orderId     String?  // Se for gerado por uma OS, fica atrelado aqui
+  order       Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("financial_transactions")
 }

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Plus, Package, ArrowUpRight, ArrowDownRight, AlertTriangle, Image as ImageIcon } from "lucide-react";
+import { Search, Plus, Minus, ArrowUpRight, ArrowDownRight, Image as ImageIcon, Edit, FileEdit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -10,21 +10,30 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { createProduct, adjustStock } from "@/actions/inventory";
+import { createProduct, adjustStock, updateProduct } from "@/actions/inventory";
 import { toast } from "sonner";
 
-// Tipagens
-type Transaction = { id: string; type: "IN" | "OUT"; quantity: number; reason: string | null; createdAt: Date };
+type Transaction = { id: string; type: "IN" | "OUT" | "EDIT"; quantity: number; reason: string | null; createdAt: Date };
 type Product = { id: string; name: string; sku: string | null; category: string; costPrice: number; sellingPrice: number; stock: number; minStock: number; imageUrl: string | null; transactions: Transaction[] };
 
 export function ClientInventory({ products }: { products: Product[] }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [openProductModal, setOpenProductModal] = useState(false);
-  const [openAdjustModal, setOpenAdjustModal] = useState<string | null>(null);
+  const [quickAdjust, setQuickAdjust] = useState<{ product: Product, type: "IN" | "OUT" } | null>(null);
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
+
+  // Estados para alternar entre "Selecionar Categoria" e "Criar Nova"
+  const [isCustomCategoryCreate, setIsCustomCategoryCreate] = useState(false);
+  const [isCustomCategoryEdit, setIsCustomCategoryEdit] = useState(false);
+
+  // Gera a lista de categorias dinamicamente (Padrões + As que já existem no banco)
+  const defaultCategories = ["Escapamentos", "Abraçadeiras", "Ponteiras", "Catalisadores", "Consumíveis", "Acessórios", "Injeção"];
+  const uniqueCategories = Array.from(new Set([...defaultCategories, ...products.map(p => p.category)])).sort();
 
   const filteredProducts = products.filter(p => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+    p.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.category.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
@@ -34,19 +43,23 @@ export function ClientInventory({ products }: { products: Product[] }) {
       await createProduct(formData);
       toast.success("Peça cadastrada com sucesso!");
       setOpenProductModal(false);
-    } catch (error) {
-      toast.error("Erro ao cadastrar peça.");
-    }
+    } catch { toast.error("Erro ao cadastrar peça."); }
   };
 
   const handleAdjustStock = async (formData: FormData) => {
     try {
       await adjustStock(formData);
-      toast.success("Estoque ajustado com sucesso!");
-      setOpenAdjustModal(null);
-    } catch (error) {
-      toast.error("Erro ao ajustar estoque.");
-    }
+      toast.success(`Estoque atualizado com sucesso!`);
+      setQuickAdjust(null);
+    } catch { toast.error("Erro ao ajustar estoque."); }
+  };
+
+  const handleUpdateProduct = async (formData: FormData) => {
+    try {
+      await updateProduct(formData);
+      toast.success("Dados da peça atualizados!");
+      setEditProduct(null);
+    } catch { toast.error("Erro ao atualizar peça."); }
   };
 
   return (
@@ -54,10 +67,13 @@ export function ClientInventory({ products }: { products: Product[] }) {
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-          <Input placeholder="Buscar por nome ou código (SKU)..." className="pl-9 bg-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <Input placeholder="Buscar por nome, código (SKU) ou categoria..." className="pl-9 bg-white shadow-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
 
-        <Dialog open={openProductModal} onOpenChange={setOpenProductModal}>
+        <Dialog open={openProductModal} onOpenChange={(open) => {
+          setOpenProductModal(open);
+          if (!open) setIsCustomCategoryCreate(false); // Reseta o campo ao fechar
+        }}>
           <DialogTrigger asChild>
             <Button className="shadow-sm"><Plus className="mr-2 h-4 w-4" /> Nova Peça</Button>
           </DialogTrigger>
@@ -72,19 +88,33 @@ export function ClientInventory({ products }: { products: Product[] }) {
                 <label className="text-sm font-medium">Código (SKU)</label>
                 <Input name="sku" placeholder="Ex: SIL-VW-001" />
               </div>
+              
+              {/* CAMPO DE CATEGORIA INTELIGENTE */}
               <div className="space-y-2">
-                <label className="text-sm font-medium">Categoria</label>
-                <Select name="category" defaultValue="Escapamentos">
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Escapamentos">Escapamentos</SelectItem>
-                    <SelectItem value="Abraçadeiras">Abraçadeiras</SelectItem>
-                    <SelectItem value="Ponteiras">Ponteiras</SelectItem>
-                    <SelectItem value="Catalisadores">Catalisadores</SelectItem>
-                    <SelectItem value="Consumíveis">Consumíveis (Solda, etc)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Categoria</label>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsCustomCategoryCreate(!isCustomCategoryCreate)} 
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 uppercase tracking-wider transition-colors"
+                  >
+                    {isCustomCategoryCreate ? "Selecionar Existente" : "+ Nova Categoria"}
+                  </button>
+                </div>
+                {isCustomCategoryCreate ? (
+                  <Input name="category" placeholder="Digite a nova categoria..." required autoFocus />
+                ) : (
+                  <Select name="category" defaultValue="Escapamentos">
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {uniqueCategories.map(cat => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Preço de Custo (R$)</label>
                 <Input name="costPrice" type="number" step="0.01" required placeholder="0.00" />
@@ -102,9 +132,8 @@ export function ClientInventory({ products }: { products: Product[] }) {
                 <Input name="minStock" type="number" defaultValue="3" required />
               </div>
               <div className="col-span-2 space-y-2">
-                <label className="text-sm font-medium">URL da Foto (Cole o link da imagem)</label>
+                <label className="text-sm font-medium">URL da Foto</label>
                 <Input name="imageUrl" placeholder="https://exemplo.com/foto.jpg" />
-                <p className="text-xs text-zinc-500">Integração nativa de upload será ativada após a apresentação.</p>
               </div>
               <Button type="submit" className="col-span-2 mt-4">Cadastrar Peça</Button>
             </form>
@@ -113,91 +142,82 @@ export function ClientInventory({ products }: { products: Product[] }) {
       </div>
 
       <Tabs defaultValue="list" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2 mb-6 shadow-sm">
           <TabsTrigger value="list">Inventário Atual</TabsTrigger>
-          <TabsTrigger value="history">Histórico (Auditoria)</TabsTrigger>
+          <TabsTrigger value="history">Auditoria / Histórico</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="list" className="bg-white border rounded-lg shadow-sm">
+        <TabsContent value="list" className="bg-white border rounded-lg shadow-sm overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow className="bg-zinc-50/50">
-                <TableHead className="w-[80px]">Foto</TableHead>
-                <TableHead>Peça & Categoria</TableHead>
-                <TableHead>Preços (Margem)</TableHead>
-                <TableHead>Estoque</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead className="w-[70px]">Foto</TableHead>
+                <TableHead>Peça & Código</TableHead>
+                <TableHead className="w-[120px]">Preço Venda</TableHead>
+                <TableHead className="w-[180px]">Custo e Margem (Passe o Mouse)</TableHead>
+                <TableHead className="w-[180px] text-center">Estoque (Rápido)</TableHead>
+                <TableHead className="text-right w-[100px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredProducts.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center py-8 text-zinc-500">Nenhuma peça cadastrada.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center py-12 text-zinc-500">Nenhuma peça encontrada.</TableCell></TableRow>
               )}
               {filteredProducts.map((p) => {
-                const margin = p.sellingPrice > 0 ? ((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100 : 0;
+                const profit = p.sellingPrice - p.costPrice;
+                const margin = p.sellingPrice > 0 ? (profit / p.sellingPrice) * 100 : 0;
                 const status = p.stock === 0 ? "OUT" : p.stock <= p.minStock ? "LOW" : "OK";
 
                 return (
-                  <TableRow key={p.id}>
+                  <TableRow key={p.id} className="group/row">
                     <TableCell>
                       {p.imageUrl ? (
-                        <img src={p.imageUrl} alt={p.name} className="w-12 h-12 rounded-md object-cover border" />
+                        <img src={p.imageUrl} alt={p.name} className="w-10 h-10 rounded-md object-cover border" />
                       ) : (
-                        <div className="w-12 h-12 rounded-md bg-zinc-100 flex items-center justify-center border text-zinc-400"><ImageIcon className="w-5 h-5"/></div>
+                        <div className="w-10 h-10 rounded-md bg-zinc-100 flex items-center justify-center border text-zinc-400"><ImageIcon className="w-4 h-4"/></div>
                       )}
                     </TableCell>
                     <TableCell>
-                      <p className="font-medium text-zinc-900">{p.name}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-zinc-500 font-mono">{p.sku || 'S/N'}</span>
-                        <Badge variant="outline" className="text-[10px] h-4">{p.category}</Badge>
+                      <p className="font-bold text-sm text-zinc-900 leading-none">{p.name}</p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-xs text-zinc-500 font-mono bg-zinc-100 px-1.5 py-0.5 rounded">{p.sku || 'S/N'}</span>
+                        <Badge variant="outline" className="text-[9px] h-4 uppercase tracking-wider">{p.category}</Badge>
                       </div>
                     </TableCell>
+                    
                     <TableCell>
-                      <p className="font-medium text-zinc-900">{formatCurrency(p.sellingPrice)}</p>
-                      <p className="text-xs text-green-600 mt-1">{margin.toFixed(0)}% de margem</p>
+                      <span className="font-bold text-zinc-900">{formatCurrency(p.sellingPrice)}</span>
                     </TableCell>
+
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold">{p.stock}</span>
-                        {status === "OUT" && <Badge variant="destructive" className="text-[10px]">Sem Estoque</Badge>}
-                        {status === "LOW" && <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-[10px]">Baixo ({p.minStock})</Badge>}
-                        {status === "OK" && <Badge className="bg-green-100 text-green-800 hover:bg-green-100 text-[10px]">Regular</Badge>}
+                      <div className="group/privacy cursor-help select-none">
+                        <div className="blur-md group-hover/privacy:blur-none transition-all duration-300 opacity-60 group-hover/privacy:opacity-100">
+                          <p className="text-xs font-semibold text-red-600">Custo: {formatCurrency(p.costPrice)}</p>
+                          <p className="text-xs font-semibold text-emerald-600 mt-0.5">Lucro: {formatCurrency(profit)} ({margin.toFixed(0)}%)</p>
+                        </div>
                       </div>
                     </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-3">
+                        <Button variant="outline" size="icon" className="h-7 w-7 rounded-full text-zinc-500 hover:text-red-600 hover:border-red-200 hover:bg-red-50" onClick={() => setQuickAdjust({ product: p, type: 'OUT' })}>
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <div className="flex flex-col items-center justify-center w-12">
+                          <span className={`text-lg font-bold leading-none ${status === 'OUT' ? 'text-red-600' : status === 'LOW' ? 'text-yellow-600' : 'text-zinc-900'}`}>{p.stock}</span>
+                          {status === "OUT" && <span className="text-[9px] font-bold text-red-600 mt-1 uppercase">Falta</span>}
+                          {status === "LOW" && <span className="text-[9px] font-bold text-yellow-600 mt-1 uppercase">Baixo</span>}
+                        </div>
+                        <Button variant="outline" size="icon" className="h-7 w-7 rounded-full text-zinc-500 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50" onClick={() => setQuickAdjust({ product: p, type: 'IN' })}>
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+
                     <TableCell className="text-right">
-                      <Dialog open={openAdjustModal === p.id} onOpenChange={(val) => setOpenAdjustModal(val ? p.id : null)}>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">Ajustar</Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader><DialogTitle>Ajustar Estoque: {p.name}</DialogTitle></DialogHeader>
-                          <form action={handleAdjustStock} className="space-y-4 mt-4">
-                            <input type="hidden" name="productId" value={p.id} />
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium">Tipo de Movimento</label>
-                                <Select name="type" required>
-                                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="IN">Entrada (+)</SelectItem>
-                                    <SelectItem value="OUT">Saída/Baixa (-)</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-2">
-                                <label className="text-sm font-medium">Quantidade</label>
-                                <Input name="quantity" type="number" min="1" required />
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium">Motivo / Observação</label>
-                              <Input name="reason" placeholder="Ex: Compra NF 1234, Peça danificada..." required />
-                            </div>
-                            <Button type="submit" className="w-full">Salvar Movimentação</Button>
-                          </form>
-                        </DialogContent>
-                      </Dialog>
+                      <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-blue-600" onClick={() => setEditProduct(p)}>
+                        <Edit className="w-4 h-4 mr-2" /> Editar
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -206,16 +226,15 @@ export function ClientInventory({ products }: { products: Product[] }) {
           </Table>
         </TabsContent>
 
-        {/* ABA DE HISTÓRICO */}
         <TabsContent value="history" className="bg-white border rounded-lg shadow-sm">
           <Table>
             <TableHeader>
               <TableRow className="bg-zinc-50/50">
-                <TableHead>Data</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Peça</TableHead>
-                <TableHead>Qtd</TableHead>
-                <TableHead>Motivo</TableHead>
+                <TableHead>Data e Hora</TableHead>
+                <TableHead>Operação</TableHead>
+                <TableHead>Peça Referência</TableHead>
+                <TableHead>Movimentação</TableHead>
+                <TableHead>Motivo / Log</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -225,20 +244,122 @@ export function ClientInventory({ products }: { products: Product[] }) {
                 <TableRow key={t.id}>
                   <TableCell className="text-zinc-500 text-sm">{new Date(t.createdAt).toLocaleDateString('pt-BR')} às {new Date(t.createdAt).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</TableCell>
                   <TableCell>
-                    {t.type === "IN" 
-                      ? <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100"><ArrowUpRight className="w-3 h-3 mr-1"/> Entrada</Badge>
-                      : <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100"><ArrowDownRight className="w-3 h-3 mr-1"/> Saída</Badge>
-                    }
+                    {t.type === "IN" && <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100"><ArrowUpRight className="w-3 h-3 mr-1"/> Entrada</Badge>}
+                    {t.type === "OUT" && <Badge className="bg-orange-100 text-orange-800 hover:bg-orange-100"><ArrowDownRight className="w-3 h-3 mr-1"/> Saída / Baixa</Badge>}
+                    {t.type === "EDIT" && <Badge variant="secondary" className="bg-zinc-100 text-zinc-700 hover:bg-zinc-200"><FileEdit className="w-3 h-3 mr-1"/> Edição</Badge>}
                   </TableCell>
-                  <TableCell className="font-medium">{t.productName}</TableCell>
-                  <TableCell className="font-bold">{t.quantity}</TableCell>
-                  <TableCell className="text-zinc-500">{t.reason || '-'}</TableCell>
+                  <TableCell className="font-bold text-sm text-zinc-900">{t.productName}</TableCell>
+                  <TableCell>
+                    {t.type === "EDIT" ? <span className="text-zinc-400 font-mono text-sm">-</span> : <span className="font-bold font-mono text-sm">{t.type === "IN" ? '+' : '-'}{t.quantity} un</span>}
+                  </TableCell>
+                  <TableCell className="text-zinc-600 text-sm">{t.reason || '-'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!quickAdjust} onOpenChange={(open) => !open && setQuickAdjust(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {quickAdjust?.type === "IN" ? <ArrowUpRight className="text-emerald-600" /> : <ArrowDownRight className="text-orange-600" />}
+              {quickAdjust?.type === "IN" ? "Dar Entrada no Estoque" : "Dar Baixa no Estoque"}
+            </DialogTitle>
+          </DialogHeader>
+          <form action={handleAdjustStock} className="space-y-4 mt-2">
+            <input type="hidden" name="productId" value={quickAdjust?.product.id} />
+            <input type="hidden" name="type" value={quickAdjust?.type} />
+            
+            <div className="bg-zinc-50 p-3 rounded-md border text-sm mb-4">
+              <span className="text-zinc-500">Peça selecionada:</span><br/>
+              <span className="font-bold text-zinc-900">{quickAdjust?.product.name}</span>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Quantidade para {quickAdjust?.type === "IN" ? "Adicionar" : "Remover"}</label>
+              <Input name="quantity" type="number" min="1" required autoFocus />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Motivo (Obrigatório)</label>
+              <Input name="reason" placeholder={quickAdjust?.type === "IN" ? "Ex: Compra NF 1234, Devolução..." : "Ex: Venda, Peça com defeito, Uso na oficina..."} required />
+            </div>
+            <Button type="submit" className={`w-full ${quickAdjust?.type === "IN" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-orange-600 hover:bg-orange-700"}`}>
+              Confirmar Operação
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editProduct} onOpenChange={(open) => {
+        if (!open) {
+          setEditProduct(null);
+          setIsCustomCategoryEdit(false); // Reseta o campo ao fechar
+        }
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Editar Dados da Peça</DialogTitle></DialogHeader>
+          {editProduct && (
+            <form action={handleUpdateProduct} className="grid grid-cols-2 gap-4 mt-4">
+              <input type="hidden" name="id" value={editProduct.id} />
+              
+              <div className="col-span-2 space-y-2">
+                <label className="text-sm font-medium">Nome da Peça</label>
+                <Input name="name" defaultValue={editProduct.name} required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Código (SKU)</label>
+                <Input name="sku" defaultValue={editProduct.sku || ""} />
+              </div>
+
+              {/* CAMPO DE CATEGORIA INTELIGENTE NO MODO EDIÇÃO */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Categoria</label>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsCustomCategoryEdit(!isCustomCategoryEdit)} 
+                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 uppercase tracking-wider transition-colors"
+                  >
+                    {isCustomCategoryEdit ? "Selecionar Existente" : "+ Nova Categoria"}
+                  </button>
+                </div>
+                {isCustomCategoryEdit ? (
+                  <Input name="category" placeholder="Digite a nova categoria..." required autoFocus />
+                ) : (
+                  <Select name="category" defaultValue={editProduct.category}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {uniqueCategories.map(cat => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-red-600">Preço de Custo (R$)</label>
+                <Input name="costPrice" type="number" step="0.01" defaultValue={editProduct.costPrice} required />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-emerald-600">Preço de Venda (R$)</label>
+                <Input name="sellingPrice" type="number" step="0.01" defaultValue={editProduct.sellingPrice} required />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <label className="text-sm font-medium">Alerta de Estoque Mínimo</label>
+                <Input name="minStock" type="number" defaultValue={editProduct.minStock} required />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <label className="text-sm font-medium">URL da Foto</label>
+                <Input name="imageUrl" defaultValue={editProduct.imageUrl || ""} />
+              </div>
+              <Button type="submit" className="col-span-2 mt-4 bg-blue-600 hover:bg-blue-700">Salvar Alterações</Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

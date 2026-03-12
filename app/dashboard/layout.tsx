@@ -29,7 +29,6 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
         {/* HUD DO USUÁRIO NO RODAPÉ */}
         <div className="mt-auto border-t p-2">
-          {/* Usamos o as any para o TypeScript não reclamar da tipagem flexível do user */}
           <UserMenu user={session?.user as any} /> 
         </div>
       </div>
@@ -38,12 +37,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         {/* HEADER & MENU MOBILE (Sheet) */}
         <header className="flex h-14 items-center gap-4 border-b bg-zinc-50/50 px-4 lg:h-[60px] lg:px-6">
           <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="shrink-0 md:hidden">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Abrir menu</span>
-              </Button>
+            {/* Correção do botão duplo: Tiramos o "asChild" e passamos as classes diretamente */}
+            <SheetTrigger className="inline-flex items-center justify-center shrink-0 md:hidden h-10 w-10 border border-zinc-200 rounded-md hover:bg-zinc-100 bg-white">
+              <Menu className="h-5 w-5 text-zinc-900" />
+              <span className="sr-only">Abrir menu</span>
             </SheetTrigger>
+            
             <SheetContent side="left" className="flex flex-col h-full">
               <SheetTitle className="flex items-center gap-2 font-semibold mb-4">
                 <Wrench className="h-6 w-6" />
@@ -54,19 +53,16 @@ export default async function DashboardLayout({ children }: { children: ReactNod
                 <Sidebar role={session?.user?.role} />
               </div>
 
-              {/* HUD DO USUÁRIO NO RODAPÉ MOBILE */}
               <div className="mt-auto border-t pt-4">
                 <UserMenu user={session?.user as any} />
               </div>
             </SheetContent>
           </Sheet>
 
-          <div className="w-full flex-1" /> {/* Espaçador */}
-          
-          {/* Note que removemos o perfil do usuário daqui. O Header agora fica livre e limpo! */}
+          <div className="w-full flex-1" />
         </header>
 
-        {/* ÁREA DE CONTEÚDO (Onde as páginas entram) */}
+        {/* ÁREA DE CONTEÚDO */}
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-white">
           {children}
         </main>
