@@ -44,3 +44,8 @@ next-env.d.ts
 
 .vercel
 .env*.local
+
+prod.env.local(prod)
+prod.env(prod)
+app/api/setup/route.ts
+prisma/create-client.ts
