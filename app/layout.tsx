@@ -8,7 +8,7 @@ import { ThemeProvider } from "@/components/ThemeProvider"; // ADICIONADO AQUI
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Oficina SaaS",
+  title: "Dashboard Oficina",
   description: "Sistema de gestão inteligente para oficinas.",
 };
 

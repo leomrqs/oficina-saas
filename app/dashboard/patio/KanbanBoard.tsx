@@ -5,15 +5,15 @@ import { useState, useMemo, useRef } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { updateOrderStatus, updateOrderDetails } from "@/actions/os";
 import { toast } from "sonner";
-import { Car, Wrench, Package, CheckCircle2, User, FileText, HardHat, FileCheck, Search, Clock, Printer, Edit3, ShieldCheck, MessageCircle, ChevronDown, X, Save, Gauge, AlignLeft, Settings, Plus, Trash2 } from "lucide-react";
+import { Car, Wrench, Package, CheckCircle2, User, FileText, HardHat, FileCheck, Search, Clock, Printer, Edit3, ShieldCheck, MessageCircle, ChevronDown, X, Save, Gauge, AlignLeft, Settings, Trash2, History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useReactToPrint } from "react-to-print";
 
 const COLUMNS = [
@@ -27,16 +27,13 @@ const COLUMNS = [
 export function KanbanBoard({ initialOrders, customers, products, tenant, employees }: any) {
   const [orders, setOrders] = useState<any[]>(initialOrders);
   
-  // Filtros
   const [searchFilter, setSearchFilter] = useState("");
   const [mechanicFilter, setMechanicFilter] = useState("ALL");
 
-  // Estados do Modal
   const [openViewOS, setOpenViewOS] = useState(false); 
   const [isEditing, setIsEditing] = useState(false); 
   const [selectedOS, setSelectedOS] = useState<any | null>(null);
 
-  // Formulário do Modal
   const [selectedCustomer, setSelectedCustomerId] = useState("");
   const [selectedVehicle, setSelectedVehicleId] = useState("");
   const [mileage, setMileage] = useState("");
@@ -57,7 +54,6 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({ contentRef: printRef, documentTitle: `OS_${selectedOS?.number || '000'}` } as any);
 
-  // Aplicação dos filtros no quadro
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
       const matchSearch = o.vehicle.plate.toLowerCase().includes(searchFilter.toLowerCase()) || o.customer.name.toLowerCase().includes(searchFilter.toLowerCase());
@@ -73,6 +69,11 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
     return `Há ${diff} dias`;
   };
 
+  const getStatusName = (status: string) => {
+    const map: any = { PENDING: "Orçamento", APPROVED: "Aprovado", WAITING_PARTS: "Ag. Peça", IN_PROGRESS: "Em Serviço", READY: "Pronto", COMPLETED: "Finalizada", CANCELED: "Cancelada" };
+    return map[status] || status;
+  };
+
   const onDragEnd = async (result: any) => {
     const { destination, source, draggableId } = result;
     if (!destination) return;
@@ -84,14 +85,13 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
 
     try {
       await updateOrderStatus(draggableId, newStatus as any);
-      toast.success("Status atualizado no pátio!");
+      toast.success("Status atualizado!");
     } catch {
       toast.error("Erro ao atualizar status.");
       setOrders(orders); 
     }
   };
 
-  // Funções de Ações Rápidas nos Cards
   const triggerPDFPrint = (e: any, os: any) => {
     if (e) e.stopPropagation(); 
     setSelectedOS(os);
@@ -106,7 +106,6 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
     window.open(url, '_blank');
   };
 
-  // Funções do Modal
   const openOSDetails = (os: any) => {
     setSelectedOS(os);
     setSelectedCustomerId(os.customerId);
@@ -128,11 +127,10 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
     try {
       const data = {
         customerId: selectedCustomer, vehicleId: selectedVehicle, mileage, fuelLevel,
-        deliveryDate, problem, customerNotes, warrantyText, laborTotal, partsTotal, discount, total: grandTotal, items, mechanics
+        deliveryDate, problem, customerNotes, warrantyText, laborTotal, partsTotal, discount, total: grandTotal, items, mechanics, status: selectedOS.status
       };
       await updateOrderDetails(selectedOS.id, data);
       
-      // FIX DO ERRO DE UNDEFINED (NAME): Reconstroi os objetos completos
       const fullMechanics = mechanics.map(m => {
         const emp = employees.find((e: any) => e.id === m.employeeId);
         return { ...m, employee: emp || { name: 'Desconhecido' } };
@@ -140,11 +138,15 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
       const fullCustomer = customers.find((c: any) => c.id === selectedCustomer);
       const fullVehicle = customerVehicles.find((v: any) => v.id === selectedVehicle);
 
+      // Cria um log otimista local para aparecer na hora
+      const tempLog = { id: Math.random().toString(), newStatus: selectedOS.status, notes: "Detalhes atualizados manualmente.", createdAt: new Date() };
+
       setOrders(orders.map(o => o.id === selectedOS.id ? { 
         ...o, ...data, total: grandTotal, 
         mechanics: fullMechanics, 
         customer: fullCustomer || o.customer, 
-        vehicle: fullVehicle || o.vehicle 
+        vehicle: fullVehicle || o.vehicle,
+        history: [tempLog, ...(o.history || [])]
       } : o));
       
       toast.success("OS atualizada com sucesso!");
@@ -171,8 +173,12 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
     try {
       await updateOrderStatus(os.id, newStatus as any);
       toast.success("Status atualizado!");
-      setOrders(orders.map(o => o.id === os.id ? { ...o, status: newStatus, updatedAt: new Date() } : o));
-      setSelectedOS({ ...os, status: newStatus });
+      
+      const tempLog = { id: Math.random().toString(), oldStatus: os.status, newStatus: newStatus, notes: "Status alterado.", createdAt: new Date() };
+      
+      const updatedOrder = { ...os, status: newStatus, updatedAt: new Date(), history: [tempLog, ...(os.history || [])] };
+      setOrders(orders.map(o => o.id === os.id ? updatedOrder : o));
+      setSelectedOS(updatedOrder);
     } catch { toast.error("Erro ao atualizar o status da OS."); }
   };
 
@@ -211,8 +217,6 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
 
   return (
     <div className="flex flex-col h-full">
-      
-      {/* BARRA DE FILTROS SUPERIOR */}
       <div className="flex flex-col sm:flex-row items-center gap-3 mb-4 shrink-0 bg-white dark:bg-zinc-900 p-3 rounded-lg border dark:border-zinc-800 shadow-sm">
         <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -233,9 +237,7 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
         </div>
       </div>
 
-      {/* O KANBAN EM SI (LAYOUT RESPONSIVO AUTOMÁTICO) */}
       <DragDropContext onDragEnd={onDragEnd}>
-        {/* xl:overflow-x-hidden e flex-1 nas colunas garantem que em notebooks não tenha deslize lateral! */}
         <div className="flex h-full gap-3 xl:gap-4 items-start overflow-x-auto xl:overflow-x-hidden pb-6">
           {COLUMNS.map(column => {
             const columnOrders = filteredOrders.filter(o => o.status === column.id);
@@ -267,7 +269,6 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
                               onClick={() => openOSDetails(order)}
                               className={`relative bg-white dark:bg-zinc-950 p-4 rounded-lg border dark:border-zinc-800 shadow-sm group cursor-pointer ${snapshot.isDragging ? 'shadow-xl ring-2 ring-blue-500 scale-105 rotate-2' : 'hover:shadow-md hover:border-blue-300 dark:hover:border-blue-900 transition-all'}`}
                             >
-                              {/* BOTÕES DE AÇÃO RÁPIDA NO HOVER */}
                               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-zinc-900 rounded-md shadow-sm border dark:border-zinc-800 p-0.5 z-10">
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-blue-500" onClick={(e) => { e.stopPropagation(); openOSDetails(order); }}><Edit3 className="w-3.5 h-3.5"/></Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-green-500" onClick={(e) => { e.stopPropagation(); handleWhatsApp(e, order); }}><MessageCircle className="w-3.5 h-3.5"/></Button>
@@ -313,9 +314,6 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
         </div>
       </DragDropContext>
 
-      {/* ========================================================================= */}
-      {/* O SUPER MODAL DE EDIÇÃO DE OS (O MESMO DA TELA DE ORÇAMENTOS) */}
-      {/* ========================================================================= */}
       <Dialog open={openViewOS} onOpenChange={(open) => {
         if (!open) { setOpenViewOS(false); setIsEditing(false); }
       }}>
@@ -361,9 +359,6 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
                   )}
                 </div>
               </DialogTitle>
-              <p className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                {isEditing ? "Modo de Edição ativado. Faça suas alterações." : "Visualizando detalhes da OS direto do Pátio."}
-              </p>
             </div>
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
               {!isEditing && (
@@ -383,148 +378,200 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-zinc-900 p-5 md:p-6 border dark:border-zinc-800 rounded-xl shadow-sm space-y-4">
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 border-b dark:border-zinc-800 pb-2 flex items-center gap-2"><Car className="w-4 h-4 text-zinc-400" /> Vínculo</h3>
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Cliente Solicitante *</label>
-                    <Select onValueChange={setSelectedCustomerId} value={selectedCustomer} disabled={!isEditing}>
-                      <SelectTrigger className={`h-10 ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}>
-                        <SelectValue placeholder="Selecione o dono...">
-                          {selectedCustomer ? customers.find((c:any) => c.id === selectedCustomer)?.name : "Selecione o dono..."}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>{customers.map((c:any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Veículo do Cliente *</label>
-                    <Select onValueChange={setSelectedVehicleId} value={selectedVehicle} disabled={!isEditing || !selectedCustomer || customerVehicles.length === 0}>
-                      <SelectTrigger className={`h-10 ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}>
-                        <SelectValue placeholder={customerVehicles.length > 0 ? "Selecione a placa..." : "Nenhum carro atrelado"}>
-                          {selectedVehicle ? customerVehicles.find((v:any) => v.id === selectedVehicle)?.plate : "Selecione a placa..."}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>{customerVehicles.map((v: any) => <SelectItem key={v.id} value={v.id}>{v.plate} - {v.brand} {v.model}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                </div>
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <Tabs defaultValue="detalhes" className="w-full h-full flex flex-col">
+              <div className="px-4 md:px-8 pt-4 shrink-0 bg-white dark:bg-zinc-900 border-b dark:border-zinc-800">
+                <TabsList className="grid w-[400px] grid-cols-2 bg-zinc-100 dark:bg-zinc-950">
+                  <TabsTrigger value="detalhes">Detalhes da OS</TabsTrigger>
+                  <TabsTrigger value="auditoria" className="flex items-center gap-2"><History className="w-3.5 h-3.5"/> Histórico</TabsTrigger>
+                </TabsList>
               </div>
 
-              <div className="bg-white dark:bg-zinc-900 p-5 md:p-6 border dark:border-zinc-800 rounded-xl shadow-sm space-y-4">
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 border-b dark:border-zinc-800 pb-2 flex items-center gap-2"><Gauge className="w-4 h-4 text-zinc-400" /> Operacional e Vistoria</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Quilometragem</label>
-                    <Input className={`h-10 ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`} value={mileage} onChange={e => setMileage(e.target.value)} placeholder="Ex: 85.000" readOnly={!isEditing} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Combustível</label>
-                    <Select onValueChange={setFuelLevel} value={fuelLevel} disabled={!isEditing}>
-                      <SelectTrigger className={`h-10 ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}><SelectValue/></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Reserva">Reserva (Vazio)</SelectItem>
-                        <SelectItem value="1/4">1/4 (Um Quarto)</SelectItem>
-                        <SelectItem value="1/2">1/2 (Meio Tanque)</SelectItem>
-                        <SelectItem value="3/4">3/4</SelectItem>
-                        <SelectItem value="Cheio">Cheio</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Previsão Entrega</label>
-                    <Input type="date" className={`h-10 ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800 [color-scheme:light] dark:[color-scheme:dark]`} value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} readOnly={!isEditing} />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="bg-white dark:bg-zinc-900 p-5 md:p-6 border dark:border-zinc-800 rounded-xl shadow-sm space-y-4 col-span-1">
-                <div className="flex items-center justify-between border-b dark:border-zinc-800 pb-2">
-                  <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2"><HardHat className="w-4 h-4 text-zinc-400" /> Equipe na OS</h3>
-                  {isEditing && <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={handleAddMechanic}>+ Adicionar</Button>}
-                </div>
-                {mechanics.length === 0 ? (
-                  <p className="text-xs text-zinc-500 italic">Nenhum mecânico atrelado.</p>
-                ) : (
-                  mechanics.map((mech) => (
-                    <div key={mech.id} className={`flex flex-col gap-2 p-3 ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-zinc-50 dark:bg-zinc-950'} border dark:border-zinc-800 rounded-md`}>
-                      <Select onValueChange={(val) => updateMechanic(mech.id, "employeeId", val)} value={mech.employeeId} disabled={!isEditing}>
-                        <SelectTrigger className={`h-9 text-xs ${!isEditing ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-900'} dark:border-zinc-700`}><SelectValue placeholder="Quem vai fazer?" /></SelectTrigger>
-                        <SelectContent>{employees.map((emp:any) => <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <div className="flex gap-2">
-                        <Input className={`h-9 text-xs flex-1 ${!isEditing ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-900'} dark:border-zinc-700`} placeholder="Tarefa (Ex: Suspensão)" value={mech.task} onChange={e => updateMechanic(mech.id, "task", e.target.value)} readOnly={!isEditing} />
-                        {isEditing && <Button variant="ghost" size="icon" className="h-9 w-9 text-red-500 shrink-0" onClick={() => setMechanics(mechanics.filter(m => m.id !== mech.id))}><Trash2 className="w-4 h-4"/></Button>}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              <div className="bg-white dark:bg-zinc-900 p-5 md:p-6 border dark:border-zinc-800 rounded-xl shadow-sm col-span-1 lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1"><AlignLeft className="w-3 h-3"/> Reclamação / Defeito</label>
-                  <Textarea value={problem} onChange={e => setProblem(e.target.value)} placeholder="Motivo da visita..." className={`min-h-[80px] resize-none ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'dark:bg-zinc-950'} dark:border-zinc-800`} readOnly={!isEditing} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1"><AlignLeft className="w-3 h-3 text-emerald-500"/> Obs Cliente (PDF)</label>
-                  <Textarea value={customerNotes} onChange={e => setCustomerNotes(e.target.value)} placeholder="Vai aparecer no orçamento..." className={`min-h-[80px] resize-none ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'dark:bg-zinc-950'} dark:border-zinc-800`} readOnly={!isEditing} />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-blue-500"/> Termo Garantia</label>
-                  <Textarea value={warrantyText} onChange={e => setWarrantyText(e.target.value)} className={`min-h-[80px] resize-none text-xs ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'dark:bg-zinc-950'} dark:border-zinc-800`} readOnly={!isEditing} />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 md:p-5 border-b dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 gap-4">
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Lançamento de Itens</h3>
-                {isEditing && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => handleAddItem(true)} className="text-orange-700 border-orange-200 bg-orange-50 dark:bg-orange-500/10 dark:text-orange-400">
-                      <Settings className="w-4 h-4 mr-2"/> + Serviço
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => handleAddItem(false)} className="text-blue-700 border-blue-200 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400">
-                      <FileText className="w-4 h-4 mr-2"/> + Peça
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-4 md:p-6 space-y-4">
-                {items.length === 0 && <div className="py-8 text-center border-2 border-dashed dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-950"><p className="text-sm text-zinc-500">Nenhum item adicionado.</p></div>}
-                {items.map((item) => (
-                  <div key={item.id} className={`flex flex-col md:flex-row gap-4 md:items-end p-4 rounded-xl border dark:border-zinc-800 shadow-sm ${item.isLabor ? 'bg-orange-50/10 dark:bg-orange-950/5' : 'bg-blue-50/10 dark:bg-blue-950/5'}`}>
-                    <div className="w-full md:flex-1 space-y-1.5">
-                      <label className={`text-[10px] uppercase font-black tracking-wider ${item.isLabor ? 'text-orange-600' : 'text-blue-600'}`}>{item.isLabor ? 'Descrição do Serviço' : 'Peça do Estoque'}</label>
-                      {!item.isLabor ? (
-                        <Select onValueChange={(val) => updateItem(item.id, "productId", val)} value={item.productId} disabled={!isEditing}>
-                          <SelectTrigger className={`h-10 ${!isEditing ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}>
-                            <SelectValue placeholder="Buscar peça...">
-                              {item.productId ? products.find((p:any) => p.id === item.productId)?.name : "Buscar peça..."}
+              <TabsContent value="detalhes" className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 m-0 border-0 focus-visible:outline-none">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-white dark:bg-zinc-900 p-5 md:p-6 border dark:border-zinc-800 rounded-xl shadow-sm space-y-4">
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 border-b dark:border-zinc-800 pb-2 flex items-center gap-2"><Car className="w-4 h-4 text-zinc-400" /> Vínculo</h3>
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Cliente Solicitante *</label>
+                        <Select onValueChange={setSelectedCustomerId} value={selectedCustomer} disabled={!isEditing}>
+                          <SelectTrigger className={`h-10 ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}>
+                            <SelectValue placeholder="Selecione o dono...">
+                              {selectedCustomer ? customers.find((c:any) => c.id === selectedCustomer)?.name : "Selecione o dono..."}
                             </SelectValue>
                           </SelectTrigger>
-                          <SelectContent>{products.map((p:any) => <SelectItem key={p.id} value={p.id}>{p.name} - {formatBRL(p.sellingPrice)}</SelectItem>)}</SelectContent>
+                          <SelectContent>{customers.map((c:any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                         </Select>
-                      ) : (
-                        <Input className={`h-10 ${!isEditing ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`} value={item.name} onChange={e => updateItem(item.id, "name", e.target.value)} readOnly={!isEditing} />
-                      )}
-                    </div>
-                    <div className="flex gap-3 w-full md:w-auto items-end">
-                      <div className="w-20 space-y-1.5 shrink-0"><label className="text-[10px] uppercase font-bold text-zinc-500">Qtd</label><Input className={`h-10 text-center font-bold ${!isEditing ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'}`} type="number" min="1" value={item.quantity} onChange={e => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)} readOnly={!isEditing} /></div>
-                      <div className="flex-1 md:w-32 space-y-1.5"><label className="text-[10px] uppercase font-bold text-zinc-500">Unitário</label><Input className={`h-10 ${!isEditing ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'}`} type="number" step="0.01" value={item.unitPrice} onChange={e => updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)} readOnly={!isEditing} /></div>
-                      <div className="flex-1 md:w-36 space-y-1.5"><label className="text-[10px] uppercase font-bold text-zinc-500">Total</label><div className={`h-10 flex items-center px-3 border dark:border-zinc-800 rounded-md font-bold text-sm ${!isEditing ? 'bg-transparent border-dashed' : 'bg-zinc-100 dark:bg-zinc-900'}`}>{formatBRL(item.total)}</div></div>
-                      {isEditing && <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0 text-red-500 hover:bg-red-50 dark:hover:bg-red-950" onClick={() => setItems(items.filter(i => i.id !== item.id))}><Trash2 className="w-4 h-4"/></Button>}
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Veículo do Cliente *</label>
+                        <Select onValueChange={setSelectedVehicleId} value={selectedVehicle} disabled={!isEditing || !selectedCustomer || customerVehicles.length === 0}>
+                          <SelectTrigger className={`h-10 ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}>
+                            <SelectValue placeholder={customerVehicles.length > 0 ? "Selecione a placa..." : "Nenhum carro atrelado"}>
+                              {selectedVehicle ? customerVehicles.find((v:any) => v.id === selectedVehicle)?.plate : "Selecione a placa..."}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>{customerVehicles.map((v: any) => <SelectItem key={v.id} value={v.id}>{v.plate} - {v.brand} {v.model}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
+
+                  <div className="bg-white dark:bg-zinc-900 p-5 md:p-6 border dark:border-zinc-800 rounded-xl shadow-sm space-y-4">
+                    <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 border-b dark:border-zinc-800 pb-2 flex items-center gap-2"><Gauge className="w-4 h-4 text-zinc-400" /> Operacional e Vistoria</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Quilometragem</label>
+                        <Input className={`h-10 ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`} value={mileage} onChange={e => setMileage(e.target.value)} placeholder="Ex: 85.000" readOnly={!isEditing} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Combustível</label>
+                        <Select onValueChange={setFuelLevel} value={fuelLevel} disabled={!isEditing}>
+                          <SelectTrigger className={`h-10 ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}><SelectValue/></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Reserva">Reserva (Vazio)</SelectItem>
+                            <SelectItem value="1/4">1/4 (Um Quarto)</SelectItem>
+                            <SelectItem value="1/2">1/2 (Meio Tanque)</SelectItem>
+                            <SelectItem value="3/4">3/4</SelectItem>
+                            <SelectItem value="Cheio">Cheio</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Previsão Entrega</label>
+                        <Input type="date" className={`h-10 ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800 [color-scheme:light] dark:[color-scheme:dark]`} value={deliveryDate} onChange={e => setDeliveryDate(e.target.value)} readOnly={!isEditing} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="bg-white dark:bg-zinc-900 p-5 md:p-6 border dark:border-zinc-800 rounded-xl shadow-sm space-y-4 col-span-1">
+                    <div className="flex items-center justify-between border-b dark:border-zinc-800 pb-2">
+                      <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2"><HardHat className="w-4 h-4 text-zinc-400" /> Equipe na OS</h3>
+                      {isEditing && <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={handleAddMechanic}>+ Adicionar</Button>}
+                    </div>
+                    {mechanics.length === 0 ? (
+                      <p className="text-xs text-zinc-500 italic">Nenhum mecânico atrelado.</p>
+                    ) : (
+                      mechanics.map((mech) => (
+                        <div key={mech.id} className={`flex flex-col gap-2 p-3 ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-zinc-50 dark:bg-zinc-950'} border dark:border-zinc-800 rounded-md`}>
+                          <Select onValueChange={(val) => updateMechanic(mech.id, "employeeId", val)} value={mech.employeeId} disabled={!isEditing}>
+                            <SelectTrigger className={`h-9 text-xs ${!isEditing ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-900'} dark:border-zinc-700`}><SelectValue placeholder="Quem vai fazer?" /></SelectTrigger>
+                            <SelectContent>{employees.map((emp:any) => <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>)}</SelectContent>
+                          </Select>
+                          <div className="flex gap-2">
+                            <Input className={`h-9 text-xs flex-1 ${!isEditing ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-900'} dark:border-zinc-700`} placeholder="Tarefa (Ex: Suspensão)" value={mech.task} onChange={e => updateMechanic(mech.id, "task", e.target.value)} readOnly={!isEditing} />
+                            {isEditing && <Button variant="ghost" size="icon" className="h-9 w-9 text-red-500 shrink-0" onClick={() => setMechanics(mechanics.filter(m => m.id !== mech.id))}><Trash2 className="w-4 h-4"/></Button>}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="bg-white dark:bg-zinc-900 p-5 md:p-6 border dark:border-zinc-800 rounded-xl shadow-sm col-span-1 lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1"><AlignLeft className="w-3 h-3"/> Reclamação / Defeito</label>
+                      <Textarea value={problem} onChange={e => setProblem(e.target.value)} placeholder="Motivo da visita..." className={`min-h-[80px] resize-none ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'dark:bg-zinc-950'} dark:border-zinc-800`} readOnly={!isEditing} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1"><AlignLeft className="w-3 h-3 text-emerald-500"/> Obs Cliente (PDF)</label>
+                      <Textarea value={customerNotes} onChange={e => setCustomerNotes(e.target.value)} placeholder="Vai aparecer no orçamento..." className={`min-h-[80px] resize-none ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'dark:bg-zinc-950'} dark:border-zinc-800`} readOnly={!isEditing} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-blue-500"/> Termo Garantia</label>
+                      <Textarea value={warrantyText} onChange={e => setWarrantyText(e.target.value)} className={`min-h-[80px] resize-none text-xs ${!isEditing ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'dark:bg-zinc-950'} dark:border-zinc-800`} readOnly={!isEditing} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden mb-8">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 md:p-5 border-b dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 gap-4">
+                    <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Lançamento de Itens</h3>
+                    {isEditing && (
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => handleAddItem(true)} className="text-orange-700 border-orange-200 bg-orange-50 dark:bg-orange-500/10 dark:text-orange-400">
+                          <Settings className="w-4 h-4 mr-2"/> + Serviço
+                        </Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => handleAddItem(false)} className="text-blue-700 border-blue-200 bg-blue-50 dark:bg-blue-500/10 dark:text-blue-400">
+                          <FileText className="w-4 h-4 mr-2"/> + Peça
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 md:p-6 space-y-4">
+                    {items.length === 0 && <div className="py-8 text-center border-2 border-dashed dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-950"><p className="text-sm text-zinc-500">Nenhum item adicionado.</p></div>}
+                    {items.map((item) => (
+                      <div key={item.id} className={`flex flex-col md:flex-row gap-4 md:items-end p-4 rounded-xl border dark:border-zinc-800 shadow-sm ${item.isLabor ? 'bg-orange-50/10 dark:bg-orange-950/5' : 'bg-blue-50/10 dark:bg-blue-950/5'}`}>
+                        <div className="w-full md:flex-1 space-y-1.5">
+                          <label className={`text-[10px] uppercase font-black tracking-wider ${item.isLabor ? 'text-orange-600' : 'text-blue-600'}`}>{item.isLabor ? 'Descrição do Serviço' : 'Peça do Estoque'}</label>
+                          {!item.isLabor ? (
+                            <Select onValueChange={(val) => updateItem(item.id, "productId", val)} value={item.productId} disabled={!isEditing}>
+                              <SelectTrigger className={`h-10 ${!isEditing ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}>
+                                <SelectValue placeholder="Buscar peça...">
+                                  {item.productId ? products.find((p:any) => p.id === item.productId)?.name : "Buscar peça..."}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>{products.map((p:any) => <SelectItem key={p.id} value={p.id}>{p.name} - {formatBRL(p.sellingPrice)}</SelectItem>)}</SelectContent>
+                            </Select>
+                          ) : (
+                            <Input className={`h-10 ${!isEditing ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`} value={item.name} onChange={e => updateItem(item.id, "name", e.target.value)} readOnly={!isEditing} />
+                          )}
+                        </div>
+                        <div className="flex gap-3 w-full md:w-auto items-end">
+                          <div className="w-20 space-y-1.5 shrink-0"><label className="text-[10px] uppercase font-bold text-zinc-500">Qtd</label><Input className={`h-10 text-center font-bold ${!isEditing ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'}`} type="number" min="1" value={item.quantity} onChange={e => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)} readOnly={!isEditing} /></div>
+                          <div className="flex-1 md:w-32 space-y-1.5"><label className="text-[10px] uppercase font-bold text-zinc-500">Unitário</label><Input className={`h-10 ${!isEditing ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'}`} type="number" step="0.01" value={item.unitPrice} onChange={e => updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)} readOnly={!isEditing} /></div>
+                          <div className="flex-1 md:w-36 space-y-1.5"><label className="text-[10px] uppercase font-bold text-zinc-500">Total</label><div className={`h-10 flex items-center px-3 border dark:border-zinc-800 rounded-md font-bold text-sm ${!isEditing ? 'bg-transparent border-dashed' : 'bg-zinc-100 dark:bg-zinc-900'}`}>{formatBRL(item.total)}</div></div>
+                          {isEditing && <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0 text-red-500 hover:bg-red-50 dark:hover:bg-red-950" onClick={() => setItems(items.filter(i => i.id !== item.id))}><Trash2 className="w-4 h-4"/></Button>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* ABA 2: A NOVA AUDITORIA DE STATUS */}
+              <TabsContent value="auditoria" className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 m-0 border-0 focus-visible:outline-none">
+                <div className="max-w-2xl mx-auto">
+                  <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-6 flex items-center gap-2">
+                    <History className="w-5 h-5 text-zinc-500"/> Timeline da OS
+                  </h3>
+                  
+                  {(!selectedOS?.history || selectedOS.history.length === 0) ? (
+                    <div className="text-center py-12 border border-dashed rounded-xl border-zinc-300 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+                      <Clock className="w-8 h-8 text-zinc-300 mx-auto mb-2"/>
+                      <p className="text-sm text-zinc-500">Nenhum registro de alteração de status encontrado.</p>
+                      <p className="text-xs text-zinc-400 mt-1">As próximas mudanças no Kanban aparecerão aqui.</p>
+                    </div>
+                  ) : (
+                    <div className="relative border-l-2 border-zinc-200 dark:border-zinc-800 ml-3 md:ml-4 space-y-8 pb-4">
+                      {selectedOS.history.map((log: any) => (
+                        <div key={log.id} className="relative pl-6 md:pl-8">
+                          <span className="absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 border-white dark:border-zinc-950 bg-blue-500 ring-4 ring-zinc-50 dark:ring-zinc-900" />
+                          
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                              <Clock className="w-3 h-3"/> 
+                              {new Date(log.createdAt).toLocaleDateString('pt-BR')} às {new Date(log.createdAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          
+                          <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-lg p-4 shadow-sm mt-2">
+                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                              {log.oldStatus ? <Badge variant="secondary" className="bg-zinc-100 dark:bg-zinc-800 text-zinc-500">{getStatusName(log.oldStatus)}</Badge> : <Badge variant="secondary">Criação</Badge>}
+                              <span className="text-zinc-400">→</span>
+                              {getStatusBadge(log.newStatus)}
+                            </div>
+                            <p className="text-sm text-zinc-700 dark:text-zinc-300">{log.notes || "Status alterado."}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
 
           <div className="px-4 py-4 md:px-8 md:py-5 bg-zinc-900 dark:bg-zinc-950 border-t dark:border-zinc-800 shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center z-20 gap-4 overflow-x-auto">
@@ -543,41 +590,9 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* COMPONENTE INVISÍVEL DO PDF PARA IMPRESSÃO RÁPIDA */}
-      <div style={{ display: "none" }}>
-        <div ref={printRef} className="print-wrapper">
-          {selectedOS && (
-            <div className="print-container bg-white text-black p-[10mm] w-[210mm] min-h-[297mm] mx-auto text-sm font-sans" style={{ color: 'black' }}>
-              <div className="flex justify-between items-start border-b-2 border-zinc-800 pb-4 mb-6">
-                <div className="flex items-center gap-4">
-                  {tenant?.logoUrl && <img src={tenant.logoUrl} alt="Logo" className="w-20 h-20 object-contain" />}
-                  <div>
-                    <h1 className="text-2xl font-black uppercase text-zinc-900">{tenant?.name || "OFICINA SAAS"}</h1>
-                    {tenant?.cnpj && <p className="text-xs font-bold text-zinc-600">CNPJ: {tenant.cnpj}</p>}
-                    <p className="text-xs text-zinc-600 mt-1 max-w-[250px]">{tenant?.address || "Endereço não cadastrado"}</p>
-                    <p className="text-xs text-zinc-600 mt-0.5">WhatsApp: {tenant?.phone || "Não informado"}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-3xl font-black text-zinc-300">OS #{selectedOS.number}</p>
-                  <p className="text-sm font-bold text-zinc-600 mt-1">Data: {new Date(selectedOS.createdAt).toLocaleDateString('pt-BR')}</p>
-                </div>
-              </div>
-              <div className="flex border border-zinc-300 rounded-md overflow-hidden mb-6">
-                <div className="w-1/2 p-3 bg-zinc-50 border-r border-zinc-300">
-                  <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Dados do Cliente</p>
-                  <p className="font-bold text-base text-zinc-900">{selectedOS.customer.name}</p>
-                </div>
-                <div className="w-1/2 p-3">
-                  <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Veículo e Vistoria</p>
-                  <p className="font-bold text-base text-zinc-900">{selectedOS.vehicle.brand} {selectedOS.vehicle.model} <span className="font-normal text-zinc-500">| {selectedOS.vehicle.year || ''}</span></p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      
+      {/* Componente de Impressão */}
+      <div style={{ display: "none" }}><div ref={printRef}></div></div>
     </div>
   );
 }

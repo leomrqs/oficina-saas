@@ -12,12 +12,10 @@ export default async function PatioPage() {
 
   const tenantId = session.user.tenantId;
 
-  // 1. Busca os dados da Oficina
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId }
   });
 
-  // 2. Busca todas as OS ativas (com itens e tudo mais para abrir no modal)
   const activeOrders = await prisma.order.findMany({
     where: { 
       tenantId,
@@ -27,12 +25,12 @@ export default async function PatioPage() {
       customer: true,
       vehicle: true,
       items: true,
-      mechanics: { include: { employee: true } }
+      mechanics: { include: { employee: true } },
+      history: { orderBy: { createdAt: 'desc' } } // Traz o histórico ordenado
     },
     orderBy: { updatedAt: 'asc' } 
   });
 
-  // 3. Busca os outros dados necessários para o modal de edição funcionar
   const customers = await prisma.customer.findMany({
     where: { tenantId },
     include: { vehicles: true },
@@ -56,11 +54,10 @@ export default async function PatioPage() {
           <h2 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
             <LayoutGrid className="h-8 w-8" /> Pátio Virtual
           </h2>
-          <p className="text-zinc-500 dark:text-zinc-400">Gerencie o fluxo de veículos e edite as OS diretamente daqui.</p>
+          <p className="text-zinc-500 dark:text-zinc-400">Gerencie o fluxo de veículos e audite o histórico.</p>
         </div>
       </div>
       
-      {/* Container flex-1 para preencher a tela e não quebrar o layout */}
       <div className="flex-1 overflow-hidden">
         <KanbanBoard 
           initialOrders={activeOrders} 

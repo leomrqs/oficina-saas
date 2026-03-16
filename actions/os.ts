@@ -15,7 +15,6 @@ export async function createOrder(data: any) {
       customerId: data.customerId,
       vehicleId: data.vehicleId,
       
-      // Vistoria e Operacional
       mileage: data.mileage,
       fuelLevel: data.fuelLevel,
       deliveryDate: data.deliveryDate ? new Date(`${data.deliveryDate}T12:00:00Z`) : null,
@@ -31,7 +30,6 @@ export async function createOrder(data: any) {
       status: "PENDING",
       tenantId: session.user.tenantId,
       
-      // Itens (Peças e Serviços)
       items: {
         create: data.items.map((item: any) => ({
           name: item.name,
@@ -43,17 +41,25 @@ export async function createOrder(data: any) {
           tenantId: session.user.tenantId,
         })),
       },
-      // Equipe (Funcionários Linkados)
       mechanics: {
         create: data.mechanics.map((mech: any) => ({
           employeeId: mech.employeeId,
           task: mech.task
         }))
+      },
+      // LOG INICIAL
+      history: {
+        create: {
+          newStatus: "PENDING",
+          notes: "Orçamento criado.",
+          tenantId: session.user.tenantId
+        }
       }
     },
   });
 
   revalidatePath("/dashboard/os");
+  revalidatePath("/dashboard/patio");
   return order.id;
 }
 
@@ -61,26 +67,38 @@ export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | 
   const session = await getServerSession(authOptions);
   if (!session?.user?.tenantId) throw new Error("Não autorizado");
 
-  // IMPORTANTE: Agora incluímos os "items" para saber quais peças movimentar
   const order = await prisma.order.findUnique({ 
     where: { id: orderId },
     include: { items: true } 
   });
   if (!order) throw new Error("OS não encontrada");
 
-  // Trava de segurança para saber se já tinha dado baixa antes
   const wasAlreadyCompleted = order.status === "COMPLETED";
 
   await prisma.$transaction(async (tx) => {
-    // 1. Atualiza o status da OS
+    // 1. Atualiza status
     await tx.order.update({
       where: { id: orderId, tenantId: session.user.tenantId },
       data: { status: newStatus },
     });
 
-    // 2. SE ESTIVER FINALIZANDO A OS
+    // 2. CRIA LOG DE AUDITORIA
+    let logNote = "Status atualizado manualmente.";
+    if (newStatus === "COMPLETED") logNote = "Finalizada. Baixa automática de estoque.";
+    if (newStatus === "CANCELED") logNote = "Orçamento cancelado/reprovado.";
+
+    await tx.orderHistory.create({
+      data: {
+        oldStatus: order.status,
+        newStatus: newStatus,
+        notes: logNote,
+        orderId: order.id,
+        tenantId: session.user.tenantId,
+      }
+    });
+
+    // 3. Financeiro e Estoque
     if (newStatus === "COMPLETED") {
-      // 2A. Geração do Financeiro
       const existingTx = await tx.financialTransaction.findFirst({
         where: { orderId: orderId, tenantId: session.user.tenantId }
       });
@@ -101,17 +119,13 @@ export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | 
         });
       }
 
-      // 2B. BAIXA DE ESTOQUE AUTOMÁTICA
       if (!wasAlreadyCompleted) {
         for (const item of order.items) {
-          // Só mexe no estoque se for Peça (não mão de obra) e tiver Produto ID
           if (!item.isLabor && item.productId) {
             await tx.product.update({
               where: { id: item.productId },
               data: { stock: { decrement: item.quantity } }
             });
-            
-            // Registra a saída no histórico do estoque
             await tx.inventoryTransaction.create({
               data: {
                 type: "OUT",
@@ -125,14 +139,11 @@ export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | 
         }
       }
     } 
-    // 3. SE ESTIVER DESFAZENDO (Ex: Era Completed e voltou para Cancelado ou Em Serviço)
     else {
-      // Remove a transação financeira
       await tx.financialTransaction.deleteMany({
         where: { orderId: orderId, tenantId: session.user.tenantId }
       });
 
-      // Estorna o estoque de volta para a prateleira
       if (wasAlreadyCompleted) {
         for (const item of order.items) {
           if (!item.isLabor && item.productId) {
@@ -140,7 +151,6 @@ export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | 
               where: { id: item.productId },
               data: { stock: { increment: item.quantity } }
             });
-            
             await tx.inventoryTransaction.create({
               data: {
                 type: "IN",
@@ -156,8 +166,8 @@ export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | 
     }
   });
 
-  // Limpa o cache das telas para atualizar tudo em tempo real!
   revalidatePath("/dashboard/os");
+  revalidatePath("/dashboard/patio");
   revalidatePath("/dashboard/financeiro");
   revalidatePath("/dashboard/estoque");
 }
@@ -170,19 +180,17 @@ export async function deleteOrder(orderId: string) {
     where: { id: orderId, tenantId: session.user.tenantId },
   });
   revalidatePath("/dashboard/os");
+  revalidatePath("/dashboard/patio");
 }
 
 export async function updateOrderDetails(orderId: string, data: any) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.tenantId) throw new Error("Não autorizado");
 
-  // Usamos uma "Transação" para garantir que, se der erro no meio, ele desfaz tudo e não quebra a OS
   await prisma.$transaction(async (tx) => {
-    // 1. Limpa os itens e mecânicos antigos desta OS
     await tx.orderItem.deleteMany({ where: { orderId, tenantId: session.user.tenantId } });
     await tx.orderMechanic.deleteMany({ where: { orderId, employee: { tenantId: session.user.tenantId } } });
 
-    // 2. Atualiza os dados principais e recria os itens novos
     await tx.order.update({
       where: { id: orderId, tenantId: session.user.tenantId },
       data: {
@@ -218,7 +226,18 @@ export async function updateOrderDetails(orderId: string, data: any) {
         } : undefined
       },
     });
+    
+    // Opcional: Adicionar log avisando que a OS foi modificada (sem mudar status)
+    await tx.orderHistory.create({
+      data: {
+        newStatus: data.status || "PENDING", // Pega o status atual que veio ou default
+        notes: "Detalhes da OS (Peças/Valores) atualizados manualmente.",
+        orderId: orderId,
+        tenantId: session.user.tenantId,
+      }
+    });
   });
 
   revalidatePath("/dashboard/os");
+  revalidatePath("/dashboard/patio");
 }
