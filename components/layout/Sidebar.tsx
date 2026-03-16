@@ -3,15 +3,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Wrench, LayoutDashboard, Users, Package, FileText, DollarSign, Settings, Building } from "lucide-react";
+import { LayoutDashboard, Users, Package, FileText, DollarSign, Settings, Building } from "lucide-react";
 
 // Links do Cliente (Oficina)
 const managerItems = [
   { name: "Painel da Oficina", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Clientes & Veículos", href: "/dashboard/clientes", icon: Users },
-  { name: "Estoque", href: "/dashboard/estoque", icon: Package },
   { name: "Orçamentos & OS", href: "/dashboard/os", icon: FileText },
+  { name: "Clientes & Veículos", href: "/dashboard/clientes", icon: Users },
+  { name: "Estoque & Peças", href: "/dashboard/estoque", icon: Package },
   { name: "Financeiro", href: "/dashboard/financeiro", icon: DollarSign },
+  { name: "Minha Empresa", href: "/dashboard/configuracoes", icon: Settings }, // Adicionado aqui corretamente
 ];
 
 // Links Seus (Dono do SaaS)
@@ -39,8 +40,8 @@ export function Sidebar({ role }: { role?: string }) {
             href={item.href}
             className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
               isActive
-                ? "bg-zinc-100 text-zinc-900"
-                : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50"
+                ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
+                : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-900"
             }`}
           >
             <Icon className="h-4 w-4" />
