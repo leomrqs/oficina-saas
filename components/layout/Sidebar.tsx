@@ -3,19 +3,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Package, FileText, DollarSign, Settings, Building } from "lucide-react";
+import { LayoutDashboard, Users, Package, FileText, DollarSign, Settings, Building, HardHat } from "lucide-react";
 
-// Links do Cliente (Oficina)
 const managerItems = [
   { name: "Painel da Oficina", href: "/dashboard", icon: LayoutDashboard },
   { name: "Orçamentos & OS", href: "/dashboard/os", icon: FileText },
   { name: "Clientes & Veículos", href: "/dashboard/clientes", icon: Users },
   { name: "Estoque & Peças", href: "/dashboard/estoque", icon: Package },
+  { name: "Equipe & Mecânicos", href: "/dashboard/equipe", icon: HardHat }, // NOVO: Link da Equipe
   { name: "Financeiro", href: "/dashboard/financeiro", icon: DollarSign },
-  { name: "Minha Empresa", href: "/dashboard/configuracoes", icon: Settings }, // Adicionado aqui corretamente
+  { name: "Minha Empresa", href: "/dashboard/configuracoes", icon: Settings },
 ];
 
-// Links Seus (Dono do SaaS)
 const superAdminItems = [
   { name: "Visão Geral SaaS", href: "/dashboard", icon: LayoutDashboard },
   { name: "Gestão de Oficinas", href: "/dashboard/oficinas", icon: Building },
@@ -24,8 +23,6 @@ const superAdminItems = [
 
 export function Sidebar({ role }: { role?: string }) {
   const pathname = usePathname();
-  
-  // Decide qual lista de links mostrar
   const navItems = role === "SUPER_ADMIN" ? superAdminItems : managerItems;
 
   return (

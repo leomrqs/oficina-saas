@@ -9,45 +9,42 @@ datasource db {
 }
 
 enum Role {
-  SUPER_ADMIN // Dono do SaaS (Você)
-  MANAGER     // Dono/Gerente da Oficina
-  MECHANIC    // Mecânico da Oficina
+  SUPER_ADMIN
+  MANAGER
+  MECHANIC
 }
 
 enum OrderStatus {
-  PENDING   // Orçamento Pendente
-  APPROVED  // Aprovado / Em Execução
-  COMPLETED // Finalizado / Pago
-  CANCELED  // Cancelado
+  PENDING
+  APPROVED
+  COMPLETED
+  CANCELED
 }
 
 enum TransactionType {
   IN
   OUT
   EDIT
-} 
+}
 
+// VOLTAMOS COM OS ENUMS CORRETOS AQUI!
 enum FinancialType {
-  INCOME  // Receita (Entrada)
-  EXPENSE // Despesa (Saída)
+  INCOME
+  EXPENSE
 }
 
 enum FinancialStatus {
-  PENDING // Pendente (A Receber / A Pagar)
-  PAID    // Pago / Recebido
+  PENDING
+  PAID
 }
-
-// -----------------------------------------------------------------------------
-// MODELS
-// -----------------------------------------------------------------------------
 
 model Tenant {
   id           String   @id @default(cuid())
   name         String
   cnpj         String?  @unique
-  phone        String?  // NOVO: Telefone da Oficina
-  address      String?  // NOVO: Endereço completo para o PDF
-  logoUrl      String?  // NOVO: Link da imagem da logo
+  phone        String?  
+  address      String?  
+  logoUrl      String?  
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -61,6 +58,7 @@ model Tenant {
   orderItems   OrderItem[]
   financials   FinancialTransaction[]
   fixedExpenses FixedExpense[]
+  employees    Employee[] 
 
   @@map("tenants")
 }
@@ -69,7 +67,7 @@ model User {
   id        String   @id @default(cuid())
   name      String
   email     String   @unique
-  password  String   // Hash gerado pelo bcryptjs
+  password  String   
   role      Role     @default(MECHANIC)
   
   tenantId  String
@@ -81,14 +79,37 @@ model User {
   @@map("users")
 }
 
+// ==========================================
+// MÓDULO DE RECURSOS HUMANOS (EQUIPE)
+// ==========================================
+model Employee {
+  id        String   @id @default(cuid())
+  name      String
+  cpf       String?
+  phone     String?
+  role      String?  
+  isActive  Boolean  @default(true)
+  
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  orderMechanics OrderMechanic[] 
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("employees")
+}
+
+// ==========================================
+// MÓDULO DE CLIENTES E LOGÍSTICA
+// ==========================================
 model Customer {
   id           String   @id @default(cuid())
   name         String
-  document     String?  @unique // CPF ou CNPJ
+  document     String?  @unique 
   phone        String?
-  email        String?  // Novo
-  
-  // Endereço (Novos)
+  email        String?  
   cep          String?
   street       String?
   number       String?
@@ -96,8 +117,7 @@ model Customer {
   neighborhood String?
   city         String?
   state        String?
-
-  notes        String?  @db.Text // Observações internas
+  notes        String?  @db.Text 
 
   tenantId     String
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -114,8 +134,8 @@ model Customer {
 model Vehicle {
   id         String   @id @default(cuid())
   plate      String   @unique
-  brand      String   // Marca (ex: Fiat)
-  model      String   // Modelo (ex: Palio)
+  brand      String   
+  model      String   
   year       Int?
   
   customerId String
@@ -135,16 +155,14 @@ model Vehicle {
 model Product {
   id           String   @id @default(cuid())
   name         String
-  sku          String?  // Código da peça
-  imageUrl     String?  // URL da foto (Uploadthing)
-  category     String   // Ex: Escapamentos, Freios, Filtros
-  location     String?  // Ex: Prateleira A2
-  
+  sku          String?  
+  imageUrl     String?  
+  category     String   
+  location     String?  
   costPrice    Float    @default(0.0)
   sellingPrice Float    @default(0.0)
-  
   stock        Int      @default(0)
-  minStock     Int      @default(5) // Alerta de estoque baixo
+  minStock     Int      @default(5) 
   
   tenantId     String
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -160,93 +178,109 @@ model Product {
 
 model InventoryTransaction {
   id        String          @id @default(cuid())
-  type      TransactionType // IN (Entrada) ou OUT (Saída/Ajuste)
+  type      TransactionType 
   quantity  Int
-  reason    String?         // Motivo: "Compra fornecedor", "Ajuste manual", "Perda"
-  
+  reason    String?         
   productId String
   product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
-
   tenantId  String
   tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
   createdAt DateTime        @default(now())
 
   @@map("inventory_transactions")
 }
 
+// ==========================================
+// MÓDULO DE OS (REWORK MÁXIMO)
+// ==========================================
 model Order {
-  id         String      @id @default(cuid())
-  number     Int         @default(autoincrement()) // Número sequencial da OS (Ex: #1001)
-  status     OrderStatus @default(PENDING) // PENDING = Orçamento, APPROVED = Em serviço, COMPLETED = Pago
+  id            String      @id @default(cuid())
+  number        Int         @default(autoincrement()) 
+  status        OrderStatus @default(PENDING) 
   
-  laborTotal Float       @default(0.0) // Total de mão de obra
-  partsTotal Float       @default(0.0) // Total de peças
-  discount   Float       @default(0.0) // Desconto concedido
-  total      Float       @default(0.0) // Valor final
+  laborTotal    Float       @default(0.0) 
+  partsTotal    Float       @default(0.0) 
+  discount      Float       @default(0.0) 
+  total         Float       @default(0.0) 
   
-  mileage    String?     // Quilometragem (KM) - Importante para garantia de escapamento
-  problem    String?     @db.Text // Reclamação do cliente
-  notes      String?     @db.Text // Obs internas / Diagnóstico do mecânico
+  // DADOS DA VISTORIA
+  mileage       String?     
+  fuelLevel     String?     @default("1/2")
+  deliveryDate  DateTime?   
   
-  customerId String
-  customer   Customer    @relation(fields: [customerId], references: [id])
+  // TEXTOS E OBSERVAÇÕES
+  problem       String?     @db.Text 
+  notes         String?     @db.Text 
+  customerNotes String?     @db.Text 
+  warrantyText  String?     @db.Text 
+  photoUrl      String?     
+  
+  customerId    String
+  customer      Customer    @relation(fields: [customerId], references: [id])
+  vehicleId     String
+  vehicle       Vehicle     @relation(fields: [vehicleId], references: [id])
+  tenantId      String
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  vehicleId  String
-  vehicle    Vehicle     @relation(fields: [vehicleId], references: [id])
+  items         OrderItem[]
+  financials    FinancialTransaction[]
+  mechanics     OrderMechanic[]
 
-  tenantId   String
-  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  items      OrderItem[]
-  financials   FinancialTransaction[]
-
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   @@map("orders")
 }
 
-model OrderItem {
+// Tabela de Ligação
+model OrderMechanic {
   id         String   @id @default(cuid())
-  name       String   // Nome da peça ou serviço (Ex: "Solda MIG" ou "Abraçadeira 2.5")
-  isLabor    Boolean  @default(false) // True = Serviço (Não baixa estoque), False = Peça
-  
-  quantity   Int      @default(1)
-  unitPrice  Float
-  total      Float
-  
-  productId  String?  // Se for uma peça do estoque, liga aqui
-  product    Product? @relation(fields: [productId], references: [id])
+  task       String?  
   
   orderId    String
   order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
+  @@map("order_mechanics")
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  name       String   
+  isLabor    Boolean  @default(false) 
+  quantity   Int      @default(1)
+  unitPrice  Float
+  total      Float
+  productId  String?  
+  product    Product? @relation(fields: [productId], references: [id])
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   tenantId   String
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("order_items")
 }
 
+// ==========================================
+// MÓDULO FINANCEIRO
+// ==========================================
 model FinancialTransaction {
   id          String   @id @default(cuid())
-  title       String   // Ex: "Conta de Luz", "OS #1001", "Compra Fornecedor X"
-  type        FinancialType
-  category    String   // Ex: "Impostos", "Fornecedores", "Receitas Operacionais"
+  title       String   
+  type        FinancialType // <-- VOLTOU O ENUM SEGURO
+  category    String   
   amount      Float
-  status      FinancialStatus @default(PENDING)
-  
-  dueDate     DateTime // Data de vencimento
-  paymentDate DateTime? // Data em que foi efetivamente pago/recebido
-  
+  status      FinancialStatus @default(PENDING) // <-- VOLTOU O ENUM SEGURO
+  paymentMethod String? 
+  dueDate     DateTime 
+  paymentDate DateTime? 
   notes       String?  @db.Text
-
-  orderId     String?  // Se for gerado por uma OS, fica atrelado aqui
+  orderId     String?  
   order       Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
-
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -255,14 +289,12 @@ model FinancialTransaction {
 
 model FixedExpense {
   id          String   @id @default(cuid())
-  title       String   // Ex: "Conta de Luz", "Aluguel"
-  category    String   // Ex: "Água / Luz / Internet"
+  title       String   
+  category    String   
   amount      Float
-  dueDay      Int      // Dia de vencimento no mês (1 a 31)
-  
+  dueDay      Int      
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

@@ -1,20 +1,22 @@
-// lib/prisma.ts
+import { PrismaClient } from '@prisma/client';
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = `${process.env.DATABASE_URL}`;
 
-// Garante que o pool só tente conectar se a string existir (evita crash no build)
-const pool = connectionString ? new Pool({ connectionString }) : null;
-const adapter = pool ? new PrismaPg(pool) : null;
+const globalForPrisma = global as unknown as { prisma: PrismaClient; pool: Pool };
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+// Cria o pool de conexão apenas uma vez para não derrubar o banco no Next.js
+if (!globalForPrisma.pool) {
+  globalForPrisma.pool = new Pool({ connectionString });
+}
+
+const adapter = new PrismaPg(globalForPrisma.pool);
 
 export const prisma =
   globalForPrisma.prisma ||
-  new PrismaClient({
-    adapter,
-  });
+  new PrismaClient({ adapter });
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
+}

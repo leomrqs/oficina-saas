@@ -14,15 +14,24 @@ export async function createOrder(data: any) {
     data: {
       customerId: data.customerId,
       vehicleId: data.vehicleId,
+      
+      // Vistoria e Operacional
       mileage: data.mileage,
+      fuelLevel: data.fuelLevel,
+      deliveryDate: data.deliveryDate ? new Date(`${data.deliveryDate}T12:00:00Z`) : null,
       problem: data.problem,
       notes: data.notes,
+      customerNotes: data.customerNotes,
+      warrantyText: data.warrantyText,
+      
       laborTotal: data.laborTotal,
       partsTotal: data.partsTotal,
       discount: data.discount,
       total: data.total,
       status: "PENDING",
       tenantId: session.user.tenantId,
+      
+      // Itens (Peças e Serviços)
       items: {
         create: data.items.map((item: any) => ({
           name: item.name,
@@ -34,6 +43,13 @@ export async function createOrder(data: any) {
           tenantId: session.user.tenantId,
         })),
       },
+      // Equipe (Funcionários Linkados)
+      mechanics: {
+        create: data.mechanics.map((mech: any) => ({
+          employeeId: mech.employeeId,
+          task: mech.task
+        }))
+      }
     },
   });
 
@@ -41,7 +57,7 @@ export async function createOrder(data: any) {
   return order.id;
 }
 
-export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | "APPROVED" | "COMPLETED" | "CANCELED") {
+export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | "APPROVED" | "COMPLETED" | "CANCELED", paymentMethod?: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.tenantId) throw new Error("Não autorizado");
 
@@ -49,27 +65,24 @@ export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | 
   if (!order) throw new Error("OS não encontrada");
 
   await prisma.$transaction(async (tx) => {
-    // 1. Atualiza o status da OS
     await tx.order.update({
       where: { id: orderId, tenantId: session.user.tenantId },
       data: { status: newStatus },
     });
 
-    // 2. INTEGRAÇÃO FINANCEIRA AUTOMÁTICA
     if (newStatus === "COMPLETED") {
-      // Se finalizou, joga pro Caixa como Receita Paga
       const existingTx = await tx.financialTransaction.findFirst({
         where: { orderId: orderId, tenantId: session.user.tenantId }
       });
-      
       if (!existingTx) {
         await tx.financialTransaction.create({
           data: {
-            title: `Recebimento OS #${order.number}`,
+            title: `OS #${order.number} - ${paymentMethod || "Pagamento"}`,
             type: "INCOME",
             category: "Serviços Realizados",
             amount: order.total,
             status: "PAID",
+            paymentMethod: paymentMethod || "Não informado",
             dueDate: new Date(),
             paymentDate: new Date(),
             orderId: order.id,
@@ -78,7 +91,6 @@ export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | 
         });
       }
     } else {
-      // Se voltou pra orçamento ou cancelou, remove do Caixa (se existir)
       await tx.financialTransaction.deleteMany({
         where: { orderId: orderId, tenantId: session.user.tenantId }
       });
@@ -95,6 +107,56 @@ export async function deleteOrder(orderId: string) {
 
   await prisma.order.delete({
     where: { id: orderId, tenantId: session.user.tenantId },
+  });
+  revalidatePath("/dashboard/os");
+}
+
+export async function updateOrderDetails(orderId: string, data: any) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.tenantId) throw new Error("Não autorizado");
+
+  // Usamos uma "Transação" para garantir que, se der erro no meio, ele desfaz tudo e não quebra a OS
+  await prisma.$transaction(async (tx) => {
+    // 1. Limpa os itens e mecânicos antigos desta OS
+    await tx.orderItem.deleteMany({ where: { orderId, tenantId: session.user.tenantId } });
+    await tx.orderMechanic.deleteMany({ where: { orderId, employee: { tenantId: session.user.tenantId } } });
+
+    // 2. Atualiza os dados principais e recria os itens novos
+    await tx.order.update({
+      where: { id: orderId, tenantId: session.user.tenantId },
+      data: {
+        customerId: data.customerId,
+        vehicleId: data.vehicleId,
+        mileage: data.mileage,
+        fuelLevel: data.fuelLevel,
+        deliveryDate: data.deliveryDate ? new Date(`${data.deliveryDate}T12:00:00Z`) : null,
+        problem: data.problem,
+        notes: data.notes,
+        customerNotes: data.customerNotes,
+        warrantyText: data.warrantyText,
+        laborTotal: data.laborTotal,
+        partsTotal: data.partsTotal,
+        discount: data.discount,
+        total: data.total,
+        items: {
+          create: data.items.map((item: any) => ({
+            name: item.name,
+            isLabor: item.isLabor,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            total: item.total,
+            productId: item.productId || null,
+            tenantId: session.user.tenantId,
+          })),
+        },
+        mechanics: data.mechanics && data.mechanics.length > 0 ? {
+          create: data.mechanics.map((mech: any) => ({
+            employeeId: mech.employeeId,
+            task: mech.task
+          }))
+        } : undefined
+      },
+    });
   });
 
   revalidatePath("/dashboard/os");

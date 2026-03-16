@@ -46,7 +46,13 @@ async function main() {
   });
 
   // LIMPA DADOS ANTIGOS DA OFICINA PARA EVITAR DUPLICIDADE AO RODAR VÁRIAS VEZES
-  console.log('🧹 Limpando dados antigos de clientes e estoque...');
+  console.log('🧹 Limpando dados antigos...');
+  await prisma.financialTransaction.deleteMany({ where: { tenantId } });
+  await prisma.fixedExpense.deleteMany({ where: { tenantId } });
+  await prisma.orderMechanic.deleteMany({ where: { employee: { tenantId } } });
+  await prisma.orderItem.deleteMany({ where: { tenantId } });
+  await prisma.order.deleteMany({ where: { tenantId } });
+  await prisma.employee.deleteMany({ where: { tenantId } });
   await prisma.inventoryTransaction.deleteMany({ where: { tenantId } });
   await prisma.vehicle.deleteMany({ where: { tenantId } });
   await prisma.product.deleteMany({ where: { tenantId } });
@@ -160,6 +166,133 @@ async function main() {
       }
     });
   }
+
+  // =================================================================================
+  // TUDO DAQUI PARA BAIXO É NOVO (ADICIONANDO EQUIPE, OS E FINANCEIRO)
+  // =================================================================================
+
+  console.log('👷 Semeando Equipe de Funcionários...');
+  const employee1 = await prisma.employee.create({ data: { name: 'Roberto Carlos', role: 'Mecânico Sênior', phone: '11988880001', tenantId } });
+  const employee2 = await prisma.employee.create({ data: { name: 'Lucas Mendes', role: 'Mecânico Suspensão', phone: '11988880002', tenantId } });
+  const employee3 = await prisma.employee.create({ data: { name: 'Camila Torres', role: 'Atendente / Caixa', phone: '11988880003', tenantId } });
+
+  console.log('📄 Semeando Ordens de Serviço e Financeiro...');
+  
+  // Pegar clientes do banco para poder atrelar os carros às OS
+  const dbCustomers = await prisma.customer.findMany({ where: { tenantId }, include: { vehicles: true } });
+  const dbProducts = await prisma.product.findMany({ where: { tenantId } });
+
+  const pastDate = new Date();
+  pastDate.setDate(pastDate.getDate() - 10); // Há 10 dias
+
+  // OS 1: FINALIZADA E PAGA (Alimenta o Caixa do Dashboard)
+  await prisma.order.create({
+    data: {
+      number: 1001,
+      status: 'COMPLETED',
+      total: 445,
+      laborTotal: 150,
+      partsTotal: 295,
+      mileage: '105.000',
+      fuelLevel: '1/4',
+      problem: 'Barulho muito alto ao acelerar.',
+      notes: 'Silencioso traseiro furado. Substituição efetuada com sucesso.',
+      customerId: dbCustomers[0].id,
+      vehicleId: dbCustomers[0].vehicles[0].id,
+      tenantId,
+      createdAt: pastDate,
+      updatedAt: pastDate,
+      items: {
+        create: [
+          { name: 'Mão de Obra - Substituição Silencioso', isLabor: true, quantity: 1, unitPrice: 150, total: 150, tenantId },
+          { name: dbProducts[0].name, isLabor: false, productId: dbProducts[0].id, quantity: 1, unitPrice: dbProducts[0].sellingPrice, total: dbProducts[0].sellingPrice, tenantId },
+          { name: dbProducts[3].name, isLabor: false, productId: dbProducts[3].id, quantity: 1, unitPrice: dbProducts[3].sellingPrice, total: dbProducts[3].sellingPrice, tenantId }
+        ]
+      },
+      mechanics: {
+        create: [ { employeeId: employee1.id, task: 'Corte e Solda MIG' } ]
+      },
+      financials: {
+        create: [
+          {
+            title: 'OS #1001 - Carlos Eduardo',
+            type: 'INCOME',
+            category: 'Serviços Realizados',
+            amount: 445,
+            status: 'PAID',
+            paymentMethod: 'PIX',
+            dueDate: pastDate,
+            paymentDate: pastDate,
+            tenantId
+          }
+        ]
+      }
+    }
+  });
+
+  // OS 2: EM SERVIÇO (Carro está no elevador agora)
+  await prisma.order.create({
+    data: {
+      number: 1002,
+      status: 'APPROVED',
+      total: 940,
+      laborTotal: 190,
+      partsTotal: 750,
+      mileage: '88.500',
+      fuelLevel: 'Cheio',
+      problem: 'Luz de injeção acesa e carro fraco.',
+      notes: 'Catalisador entupido. Necessário substituição.',
+      customerId: dbCustomers[1].id,
+      vehicleId: dbCustomers[1].vehicles[0].id,
+      tenantId,
+      items: {
+        create: [
+          { name: 'Mão de Obra', isLabor: true, quantity: 1, unitPrice: 190, total: 190, tenantId },
+          { name: dbProducts[1].name, isLabor: false, productId: dbProducts[1].id, quantity: 1, unitPrice: dbProducts[1].sellingPrice, total: dbProducts[1].sellingPrice, tenantId }
+        ]
+      },
+      mechanics: {
+        create: [ { employeeId: employee2.id, task: 'Desmontagem Coletor' } ]
+      }
+    }
+  });
+
+  // OS 3: ORÇAMENTO PENDENTE
+  await prisma.order.create({
+    data: {
+      number: 1003,
+      status: 'PENDING',
+      total: 210,
+      laborTotal: 70,
+      partsTotal: 140,
+      mileage: '40.000',
+      fuelLevel: '1/2',
+      problem: 'Bate embaixo quando passa em lombada.',
+      notes: 'Tubo intermediário raspando, flexível danificado.',
+      customerId: dbCustomers[3].id,
+      vehicleId: dbCustomers[3].vehicles[0].id,
+      tenantId,
+      items: {
+        create: [
+          { name: 'Ajuste e Solda', isLabor: true, quantity: 1, unitPrice: 70, total: 70, tenantId },
+          { name: dbProducts[10].name, isLabor: false, productId: dbProducts[10].id, quantity: 1, unitPrice: dbProducts[10].sellingPrice, total: dbProducts[10].sellingPrice, tenantId }
+        ]
+      },
+      mechanics: {
+        create: [ { employeeId: employee1.id, task: 'Vistoria Inicial' } ]
+      }
+    }
+  });
+
+  console.log('🏦 Semeando Despesas Fixas (Contas a Pagar)...');
+  await prisma.fixedExpense.createMany({
+    data: [
+      { title: 'Aluguel do Galpão', category: 'Infraestrutura', amount: 3500.00, dueDay: 5, tenantId },
+      { title: 'Conta de Luz (Enel)', category: 'Água / Luz / Internet', amount: 850.00, dueDay: 15, tenantId },
+      { title: 'Internet Fibra', category: 'Água / Luz / Internet', amount: 120.00, dueDay: 20, tenantId },
+      { title: 'Sistema Oficina SaaS', category: 'Software e Sistemas', amount: 150.00, dueDay: 10, tenantId },
+    ]
+  });
 
   console.log('✅ Semeadura concluída com sucesso!');
   console.log('--------------------------------------------------');
