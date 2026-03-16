@@ -45,6 +45,7 @@ model Tenant {
   phone        String?  
   address      String?  
   logoUrl      String?  
+  monthlyGoal  Float    @default(50000.0)
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
-import { Search, Plus, Trash2, FileText, Printer, MessageCircle, Settings, Car, Gauge, ShieldCheck, AlignLeft, HardHat, Wrench, Eye, Edit3, X, Save } from "lucide-react";
+import { Search, Plus, Trash2, FileText, Printer, MessageCircle, Settings, Car, Gauge, ShieldCheck, AlignLeft, HardHat, Wrench, Eye, Edit3, X, Save, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -194,6 +194,18 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     } catch { toast.error("Erro ao finalizar OS."); }
   };
 
+  const handleApproveOS = async (e: any, os: any) => {
+    if (e) e.stopPropagation();
+    if(!confirm(`Deseja aprovar o orçamento da OS #${os.number}? O status mudará para "Em Serviço".`)) return;
+    try {
+      await updateOrderStatus(os.id, "APPROVED"); 
+      toast.success("Orçamento aprovado! O veículo já está em serviço.");
+      if (openViewOS) setOpenViewOS(false);
+    } catch {
+      toast.error("Erro ao aprovar orçamento.");
+    }
+  };
+
   return (
     <div className="space-y-6">
       
@@ -366,9 +378,17 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                 </>
               )}
 
-              {openViewOS && !isEditing && (
+{openViewOS && !isEditing && (
                 <>
                   <Button variant="outline" onClick={(e) => triggerPDFPrint(e, selectedOS)}><Printer className="w-4 h-4 mr-2" /> Imprimir</Button>
+                  
+                  {/* BOTÃO DE APROVAR (Aparece apenas se for PENDING) */}
+                  {selectedOS?.status === "PENDING" && (
+                    <Button variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100" onClick={(e) => handleApproveOS(e, selectedOS)}>
+                      <CheckCircle2 className="w-4 h-4 mr-2" /> Aprovar Orçamento
+                    </Button>
+                  )}
+
                   {selectedOS?.status !== "COMPLETED" && (
                     <Button variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:border-blue-500/20" onClick={() => setIsEditing(true)}>
                       <Edit3 className="w-4 h-4 mr-2" /> Editar OS
@@ -571,9 +591,20 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                 <TableCell className="text-right font-bold text-zinc-900 dark:text-zinc-100">{formatBRL(os.total)}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
+                    
                     <Button variant="ghost" size="icon" className="text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400" title="Ver Detalhes"><Eye className="w-4 h-4"/></Button>
-                    {os.status !== "COMPLETED" && <Button variant="ghost" size="icon" className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-500" onClick={(e) => handleCompleteOS(e, os)} title="Aprovar/Finalizar"><ShieldCheck className="w-4 h-4"/></Button>}
-                    <Button variant="ghost" size="icon" className="text-green-600 hover:bg-green-50 dark:text-green-500" onClick={(e) => handleWhatsApp(e, os)} title="Enviar WhatsApp"><MessageCircle className="w-4 h-4"/></Button>
+                    
+                    {/* Botão Rápido de Aprovar na Tabela (Apenas se PENDING) */}
+                    {os.status === "PENDING" && (
+                      <Button variant="ghost" size="icon" className="text-blue-600 hover:bg-blue-50 dark:text-blue-500" onClick={(e) => handleApproveOS(e, os)} title="Aprovar Orçamento">
+                        <CheckCircle2 className="w-4 h-4"/>
+                      </Button>
+                    )}
+
+                    {os.status !== "COMPLETED" && <Button variant="ghost" size="icon" className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-500" onClick={(e) => handleCompleteOS(e, os)} title="Finalizar e Lançar no Caixa"><ShieldCheck className="w-4 h-4"/></Button>}
+                    
+                    <Button variant="ghost" size="icon" className="text-green-600 hover:bg-green-50 dark:text-green-500" onClick={(e) => handleWhatsApp(e, os)} title="Enviar WhatsApp"><MessageCircle className="w-4 h-4"/> </Button>
+                    
                     <Button variant="ghost" size="icon" className="text-blue-600 hover:bg-blue-50 dark:text-blue-500" onClick={(e) => triggerPDFPrint(e, os)} title="Imprimir PDF"><Printer className="w-4 h-4"/></Button>
                   </div>
                 </TableCell>

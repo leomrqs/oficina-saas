@@ -24,3 +24,16 @@ export async function updateTenantSettings(formData: FormData) {
   revalidatePath("/dashboard/configuracoes");
   revalidatePath("/dashboard"); 
 }
+
+export async function updateMonthlyGoal(goal: number) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.tenantId) throw new Error("Não autorizado");
+
+  await prisma.tenant.update({
+    where: { id: session.user.tenantId },
+    data: { monthlyGoal: goal },
+  });
+
+  // O parâmetro "layout" força a barra lateral a recarregar imediatamente
+  revalidatePath("/dashboard", "layout"); 
+}
