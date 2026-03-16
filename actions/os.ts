@@ -57,20 +57,30 @@ export async function createOrder(data: any) {
   return order.id;
 }
 
-export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | "APPROVED" | "COMPLETED" | "CANCELED", paymentMethod?: string) {
+export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | "APPROVED" | "WAITING_PARTS" | "IN_PROGRESS" | "READY" | "COMPLETED" | "CANCELED", paymentMethod?: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.tenantId) throw new Error("Não autorizado");
 
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  // IMPORTANTE: Agora incluímos os "items" para saber quais peças movimentar
+  const order = await prisma.order.findUnique({ 
+    where: { id: orderId },
+    include: { items: true } 
+  });
   if (!order) throw new Error("OS não encontrada");
 
+  // Trava de segurança para saber se já tinha dado baixa antes
+  const wasAlreadyCompleted = order.status === "COMPLETED";
+
   await prisma.$transaction(async (tx) => {
+    // 1. Atualiza o status da OS
     await tx.order.update({
       where: { id: orderId, tenantId: session.user.tenantId },
       data: { status: newStatus },
     });
 
+    // 2. SE ESTIVER FINALIZANDO A OS
     if (newStatus === "COMPLETED") {
+      // 2A. Geração do Financeiro
       const existingTx = await tx.financialTransaction.findFirst({
         where: { orderId: orderId, tenantId: session.user.tenantId }
       });
@@ -90,15 +100,66 @@ export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | 
           }
         });
       }
-    } else {
+
+      // 2B. BAIXA DE ESTOQUE AUTOMÁTICA
+      if (!wasAlreadyCompleted) {
+        for (const item of order.items) {
+          // Só mexe no estoque se for Peça (não mão de obra) e tiver Produto ID
+          if (!item.isLabor && item.productId) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: { decrement: item.quantity } }
+            });
+            
+            // Registra a saída no histórico do estoque
+            await tx.inventoryTransaction.create({
+              data: {
+                type: "OUT",
+                quantity: item.quantity,
+                reason: `Baixa automática - OS #${order.number}`,
+                productId: item.productId,
+                tenantId: session.user.tenantId,
+              }
+            });
+          }
+        }
+      }
+    } 
+    // 3. SE ESTIVER DESFAZENDO (Ex: Era Completed e voltou para Cancelado ou Em Serviço)
+    else {
+      // Remove a transação financeira
       await tx.financialTransaction.deleteMany({
         where: { orderId: orderId, tenantId: session.user.tenantId }
       });
+
+      // Estorna o estoque de volta para a prateleira
+      if (wasAlreadyCompleted) {
+        for (const item of order.items) {
+          if (!item.isLabor && item.productId) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: { increment: item.quantity } }
+            });
+            
+            await tx.inventoryTransaction.create({
+              data: {
+                type: "IN",
+                quantity: item.quantity,
+                reason: `Estorno - OS #${order.number} (Reaberta/Cancelada)`,
+                productId: item.productId,
+                tenantId: session.user.tenantId,
+              }
+            });
+          }
+        }
+      }
     }
   });
 
+  // Limpa o cache das telas para atualizar tudo em tempo real!
   revalidatePath("/dashboard/os");
   revalidatePath("/dashboard/financeiro");
+  revalidatePath("/dashboard/estoque");
 }
 
 export async function deleteOrder(orderId: string) {

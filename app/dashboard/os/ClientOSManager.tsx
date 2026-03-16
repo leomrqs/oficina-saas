@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from "react";
-import { Search, Plus, Trash2, FileText, Printer, MessageCircle, Settings, Car, Gauge, ShieldCheck, AlignLeft, HardHat, Wrench, Eye, Edit3, X, Save, CheckCircle2 } from "lucide-react";
+import { Search, Plus, Trash2, FileText, Printer, MessageCircle, Settings, Car, Gauge, ShieldCheck, AlignLeft, HardHat, Wrench, Eye, Edit3, X, Save, CheckCircle2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { createOrder, updateOrderStatus, updateOrderDetails } from "@/actions/os"; // <-- IMPORTAMOS A FUNÇÃO AQUI
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { createOrder, updateOrderStatus, updateOrderDetails } from "@/actions/os";
 import { toast } from "sonner";
 import { useReactToPrint } from "react-to-print";
 
@@ -130,9 +131,6 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     } catch { toast.error("Erro ao gerar OS."); }
   };
 
-  // =======================================================
-  // NOVA FUNÇÃO: SALVA A EDIÇÃO NO BANCO DE DADOS
-  // =======================================================
   const handleUpdateOS = async () => {
     if (!selectedCustomer || !selectedVehicle || items.length === 0) {
       toast.error("Selecione cliente, veículo e adicione pelo menos 1 item.");
@@ -149,10 +147,10 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
         deliveryDate, problem, notes, customerNotes, warrantyText,
         laborTotal, partsTotal, discount, total: grandTotal, items, mechanics
       };
-      await updateOrderDetails(selectedOS.id, data); // CHAMA A AÇÃO DO SERVIDOR
+      await updateOrderDetails(selectedOS.id, data);
       toast.success("OS atualizada com sucesso!");
       setIsEditing(false);
-      setOpenViewOS(false); // Fecha o modal após editar
+      setOpenViewOS(false);
       resetForm();
     } catch { toast.error("Erro ao atualizar a OS no banco."); }
   };
@@ -163,9 +161,12 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
   const getStatusBadge = (status: string) => {
     switch(status) {
       case "PENDING": return <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50 dark:bg-yellow-500/10 dark:border-yellow-500/20 dark:text-yellow-500">Orçamento</Badge>;
-      case "APPROVED": return <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-400">Em Serviço</Badge>;
+      case "APPROVED": return <Badge variant="outline" className="text-sky-600 border-sky-200 bg-sky-50 dark:bg-sky-500/10 dark:border-sky-500/20 dark:text-sky-400">Aprovado</Badge>;
+      case "WAITING_PARTS": return <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400">Aguardando Peça</Badge>;
+      case "IN_PROGRESS": return <Badge variant="outline" className="text-purple-600 border-purple-200 bg-purple-50 dark:bg-purple-500/10 dark:border-purple-500/20 dark:text-purple-400">No Elevador</Badge>;
+      case "READY": return <Badge variant="outline" className="text-teal-600 border-teal-200 bg-teal-50 dark:bg-teal-500/10 dark:border-teal-500/20 dark:text-teal-400">Pronto / Retirada</Badge>;
       case "COMPLETED": return <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400">Finalizada</Badge>;
-      case "CANCELED": return <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400">Cancelada</Badge>;
+      case "CANCELED": return <Badge variant="outline" className="text-zinc-600 border-zinc-200 bg-zinc-50 dark:bg-zinc-500/10 dark:border-zinc-500/20 dark:text-zinc-400">Cancelada</Badge>;
       default: return <Badge>{status}</Badge>;
     }
   };
@@ -186,7 +187,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
 
   const handleCompleteOS = async (e: any, os: any) => {
     if (e) e.stopPropagation();
-    if(!confirm(`Deseja aprovar e finalizar a OS #${os.number} e lançar ${formatBRL(os.total)} no caixa financeiro?`)) return;
+    if(!confirm(`Deseja finalizar a OS #${os.number} e lançar ${formatBRL(os.total)} no caixa financeiro?`)) return;
     try {
       await updateOrderStatus(os.id, "COMPLETED", "Dinheiro/Pix"); 
       toast.success("OS Finalizada e lançada no Caixa!");
@@ -196,13 +197,35 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
 
   const handleApproveOS = async (e: any, os: any) => {
     if (e) e.stopPropagation();
-    if(!confirm(`Deseja aprovar o orçamento da OS #${os.number}? O status mudará para "Em Serviço".`)) return;
+    if(!confirm(`Deseja aprovar o orçamento da OS #${os.number}? O status mudará para "Aprovado".`)) return;
     try {
       await updateOrderStatus(os.id, "APPROVED"); 
-      toast.success("Orçamento aprovado! O veículo já está em serviço.");
+      toast.success("Orçamento aprovado!");
       if (openViewOS) setOpenViewOS(false);
     } catch {
       toast.error("Erro ao aprovar orçamento.");
+    }
+  };
+
+  // =========================================================================
+  // NOVA FUNÇÃO: ALTERAÇÃO DINÂMICA DE STATUS VIA DROPDOWN
+  // =========================================================================
+  const handleStatusChange = async (e: any, os: any, newStatus: string) => {
+    if (e) e.stopPropagation();
+    if (os.status === newStatus) return; // Ignora se for o mesmo status
+
+    // Se estiver mudando para COMPLETED, usa a função que avisa sobre o Caixa Financeiro
+    if (newStatus === "COMPLETED") {
+      return handleCompleteOS(e, os);
+    }
+
+    try {
+      await updateOrderStatus(os.id, newStatus as any);
+      toast.success("Status atualizado com sucesso!");
+      // Atualiza o estado local para a UI refletir a mudança instantaneamente sem fechar o modal
+      setSelectedOS({ ...os, status: newStatus });
+    } catch {
+      toast.error("Erro ao atualizar o status da OS.");
     }
   };
 
@@ -362,7 +385,43 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                 {openNewOS ? (
                   <><Wrench className="w-5 h-5 text-blue-600"/> Abertura de Orçamento</>
                 ) : (
-                  <>OS #{selectedOS?.number} {getStatusBadge(selectedOS?.status)}</>
+                  <div className="flex items-center gap-3">
+                    <span>OS #{selectedOS?.number}</span>
+                    {/* DROPDOWN MENU PARA MUDANÇA RÁPIDA DE STATUS */}
+                    {openViewOS && !isEditing ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="focus:outline-none flex items-center gap-1 hover:opacity-80 transition-opacity cursor-pointer">
+                          {getStatusBadge(selectedOS?.status)}
+                          <ChevronDown className="w-4 h-4 text-zinc-400" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="dark:bg-zinc-900 dark:border-zinc-800 p-2">
+                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "PENDING")}>
+                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-yellow-500"></div> Orçamento</div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "APPROVED")}>
+                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-sky-500"></div> Aprovado</div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "WAITING_PARTS")}>
+                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-red-500"></div> Aguardando Peça</div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "IN_PROGRESS")}>
+                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-purple-500"></div> No Elevador</div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "READY")}>
+                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-teal-500"></div> Pronto / Retirada</div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "COMPLETED")}>
+                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Finalizada</div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600 focus:text-red-600 cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "CANCELED")}>
+                            <div className="flex items-center gap-2 font-medium"><div className="w-2 h-2 rounded-full bg-zinc-500"></div> Cancelada</div>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <span className="text-sm font-normal">{getStatusBadge(selectedOS?.status)}</span>
+                    )}
+                  </div>
                 )}
               </DialogTitle>
               <p className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
@@ -378,16 +437,9 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                 </>
               )}
 
-{openViewOS && !isEditing && (
+              {openViewOS && !isEditing && (
                 <>
                   <Button variant="outline" onClick={(e) => triggerPDFPrint(e, selectedOS)}><Printer className="w-4 h-4 mr-2" /> Imprimir</Button>
-                  
-                  {/* BOTÃO DE APROVAR (Aparece apenas se for PENDING) */}
-                  {selectedOS?.status === "PENDING" && (
-                    <Button variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100" onClick={(e) => handleApproveOS(e, selectedOS)}>
-                      <CheckCircle2 className="w-4 h-4 mr-2" /> Aprovar Orçamento
-                    </Button>
-                  )}
 
                   {selectedOS?.status !== "COMPLETED" && (
                     <Button variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:border-blue-500/20" onClick={() => setIsEditing(true)}>
@@ -420,14 +472,22 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Cliente Solicitante *</label>
                     <Select onValueChange={setSelectedCustomerId} value={selectedCustomer} disabled={!isEditing && !openNewOS}>
-                      <SelectTrigger className={`h-10 ${!isEditing && !openNewOS ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}><SelectValue placeholder="Selecione o dono..." /></SelectTrigger>
+                      <SelectTrigger className={`h-10 ${!isEditing && !openNewOS ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}>
+                        <SelectValue placeholder="Selecione o dono...">
+                          {selectedCustomer ? customers.find(c => c.id === selectedCustomer)?.name : "Selecione o dono..."}
+                        </SelectValue>
+                      </SelectTrigger>
                       <SelectContent>{customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Veículo do Cliente *</label>
                     <Select onValueChange={setSelectedVehicleId} value={selectedVehicle} disabled={(!isEditing && !openNewOS) || !selectedCustomer || customerVehicles.length === 0}>
-                      <SelectTrigger className={`h-10 ${!isEditing && !openNewOS ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}><SelectValue placeholder={customerVehicles.length > 0 ? "Selecione a placa..." : "Nenhum carro atrelado"} /></SelectTrigger>
+                      <SelectTrigger className={`h-10 ${!isEditing && !openNewOS ? 'bg-zinc-50 dark:bg-zinc-950/50' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}>
+                        <SelectValue placeholder={customerVehicles.length > 0 ? "Selecione a placa..." : "Nenhum carro atrelado"}>
+                          {selectedVehicle ? customerVehicles.find(v => v.id === selectedVehicle)?.plate : "Selecione a placa..."}
+                        </SelectValue>
+                      </SelectTrigger>
                       <SelectContent>{customerVehicles.map((v: any) => <SelectItem key={v.id} value={v.id}>{v.plate} - {v.brand} {v.model}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
@@ -525,7 +585,11 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                       <label className={`text-[10px] uppercase font-black tracking-wider ${item.isLabor ? 'text-orange-600' : 'text-blue-600'}`}>{item.isLabor ? 'Descrição do Serviço' : 'Peça do Estoque'}</label>
                       {!item.isLabor ? (
                         <Select onValueChange={(val) => updateItem(item.id, "productId", val)} value={item.productId} disabled={!isEditing && !openNewOS}>
-                          <SelectTrigger className={`h-10 ${!isEditing && !openNewOS ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}><SelectValue placeholder="Buscar peça..." /></SelectTrigger>
+                          <SelectTrigger className={`h-10 ${!isEditing && !openNewOS ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}>
+                            <SelectValue placeholder="Buscar peça...">
+                              {item.productId ? products.find(p => p.id === item.productId)?.name : "Buscar peça..."}
+                            </SelectValue>
+                          </SelectTrigger>
                           <SelectContent>{products.map(p => <SelectItem key={p.id} value={p.id}>{p.name} - {formatBRL(p.sellingPrice)}</SelectItem>)}</SelectContent>
                         </Select>
                       ) : (
@@ -591,17 +655,13 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                 <TableCell className="text-right font-bold text-zinc-900 dark:text-zinc-100">{formatBRL(os.total)}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
-                    
                     <Button variant="ghost" size="icon" className="text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400" title="Ver Detalhes"><Eye className="w-4 h-4"/></Button>
                     
-                    {/* Botão Rápido de Aprovar na Tabela (Apenas se PENDING) */}
-                    {os.status === "PENDING" && (
-                      <Button variant="ghost" size="icon" className="text-blue-600 hover:bg-blue-50 dark:text-blue-500" onClick={(e) => handleApproveOS(e, os)} title="Aprovar Orçamento">
-                        <CheckCircle2 className="w-4 h-4"/>
+                    {os.status !== "COMPLETED" && (
+                      <Button variant="ghost" size="icon" className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-500" onClick={(e) => handleCompleteOS(e, os)} title="Finalizar e Lançar no Caixa">
+                        <ShieldCheck className="w-4 h-4"/>
                       </Button>
                     )}
-
-                    {os.status !== "COMPLETED" && <Button variant="ghost" size="icon" className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-500" onClick={(e) => handleCompleteOS(e, os)} title="Finalizar e Lançar no Caixa"><ShieldCheck className="w-4 h-4"/></Button>}
                     
                     <Button variant="ghost" size="icon" className="text-green-600 hover:bg-green-50 dark:text-green-500" onClick={(e) => handleWhatsApp(e, os)} title="Enviar WhatsApp"><MessageCircle className="w-4 h-4"/> </Button>
                     

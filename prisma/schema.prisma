@@ -15,10 +15,13 @@ enum Role {
 }
 
 enum OrderStatus {
-  PENDING
-  APPROVED
-  COMPLETED
-  CANCELED
+  PENDING         // Orçamento
+  APPROVED        // Orçamento Aprovado
+  WAITING_PARTS   // Aguardando Peças (NOVO)
+  IN_PROGRESS     // No Elevador (NOVO)
+  READY           // Pronto p/ Entrega (NOVO)
+  COMPLETED       // Finalizado/Pago
+  CANCELED        // Cancelado
 }
 
 enum TransactionType {
