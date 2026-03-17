@@ -47,5 +47,7 @@ next-env.d.ts
 
 prod.env.local(prod)
 prod.env(prod)
+.envPROD
+.envDEV
 app/api/setup/route.ts
 prisma/create-client.ts

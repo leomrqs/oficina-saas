@@ -62,7 +62,7 @@ model Tenant {
   financials    FinancialTransaction[]
   fixedExpenses FixedExpense[]
   employees     Employee[] 
-  orderHistory  OrderHistory[] // Relação nova adicionada
+  orderHistory  OrderHistory[]
 
   @@map("tenants")
 }
@@ -80,12 +80,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([tenantId]) // INDEX DE PERFORMANCE
   @@map("users")
 }
 
-// ==========================================
-// MÓDULO DE RECURSOS HUMANOS (EQUIPE)
-// ==========================================
 model Employee {
   id        String   @id @default(cuid())
   name      String
@@ -102,12 +100,10 @@ model Employee {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([tenantId]) // INDEX DE PERFORMANCE
   @@map("employees")
 }
 
-// ==========================================
-// MÓDULO DE CLIENTES E LOGÍSTICA
-// ==========================================
 model Customer {
   id           String   @id @default(cuid())
   name         String
@@ -132,6 +128,7 @@ model Customer {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@index([tenantId]) // INDEX DE PERFORMANCE
   @@map("customers")
 }
 
@@ -153,6 +150,8 @@ model Vehicle {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  @@index([tenantId]) // INDEX DE PERFORMANCE
+  @@index([customerId]) // INDEX DE PERFORMANCE
   @@map("vehicles")
 }
 
@@ -177,6 +176,7 @@ model Product {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  @@index([tenantId]) // INDEX DE PERFORMANCE
   @@map("products")
 }
 
@@ -191,12 +191,11 @@ model InventoryTransaction {
   tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdAt DateTime        @default(now())
 
+  @@index([tenantId]) // INDEX DE PERFORMANCE
+  @@index([productId]) // INDEX DE PERFORMANCE
   @@map("inventory_transactions")
 }
 
-// ==========================================
-// MÓDULO DE OS E AUDITORIA
-// ==========================================
 model Order {
   id            String      @id @default(cuid())
   number        Int         @default(autoincrement()) 
@@ -208,12 +207,10 @@ model Order {
   advancePayment Float      @default(0.0)
   total         Float       @default(0.0) 
   
-  // DADOS DA VISTORIA
   mileage       String?     
   fuelLevel     String?     @default("1/2")
   deliveryDate  DateTime?   
   
-  // TEXTOS E OBSERVAÇÕES
   problem       String?     @db.Text 
   notes         String?     @db.Text 
   customerNotes String?     @db.Text 
@@ -230,20 +227,22 @@ model Order {
   items         OrderItem[]
   financials    FinancialTransaction[]
   mechanics     OrderMechanic[]
-  history       OrderHistory[] // Relação adicionada aqui
+  history       OrderHistory[]
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
+  @@index([tenantId]) // INDEX DE PERFORMANCE
+  @@index([tenantId, status]) // INDEX DE PERFORMANCE COMPOSTO
+  @@index([tenantId, updatedAt]) // INDEX DE PERFORMANCE COMPOSTO
   @@map("orders")
 }
 
-// NOVO MODELO: AUDITORIA DE STATUS
 model OrderHistory {
   id          String   @id @default(uuid())
-  oldStatus   String?  // Ex: PENDING
-  newStatus   String   // Ex: APPROVED
-  notes       String?  // Opcional, para registrar motivo ou ação adicional
+  oldStatus   String?  
+  newStatus   String   
+  notes       String?  
   createdAt   DateTime @default(now())
 
   orderId     String
@@ -252,10 +251,11 @@ model OrderHistory {
   tenantId    String
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@index([orderId]) // INDEX DE PERFORMANCE
+  @@index([tenantId]) // INDEX DE PERFORMANCE
   @@map("order_history")
 }
 
-// Tabela de Ligação
 model OrderMechanic {
   id         String   @id @default(cuid())
   task       String?  
@@ -266,6 +266,8 @@ model OrderMechanic {
   employeeId String
   employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
+  @@index([orderId]) // INDEX DE PERFORMANCE
+  @@index([employeeId]) // INDEX DE PERFORMANCE
   @@map("order_mechanics")
 }
 
@@ -283,12 +285,11 @@ model OrderItem {
   tenantId   String
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@index([orderId]) // INDEX DE PERFORMANCE
+  @@index([tenantId]) // INDEX DE PERFORMANCE
   @@map("order_items")
 }
 
-// ==========================================
-// MÓDULO FINANCEIRO
-// ==========================================
 model FinancialTransaction {
   id            String          @id @default(cuid())
   title         String   
@@ -307,6 +308,9 @@ model FinancialTransaction {
   createdAt     DateTime        @default(now())
   updatedAt     DateTime        @updatedAt
 
+  @@index([tenantId]) // INDEX DE PERFORMANCE
+  @@index([tenantId, paymentDate]) // INDEX DE PERFORMANCE COMPOSTO
+  @@index([tenantId, dueDate]) // INDEX DE PERFORMANCE COMPOSTO
   @@map("financial_transactions")
 }
 
@@ -321,5 +325,6 @@ model FixedExpense {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([tenantId]) // INDEX DE PERFORMANCE
   @@map("fixed_expenses")
 }
