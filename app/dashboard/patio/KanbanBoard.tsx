@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useRef } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { updateOrderStatus, updateOrderDetails } from "@/actions/os";
+import { updateOrderStatus, updateOrderDetails, deleteOrder } from "@/actions/os";
 import { toast } from "sonner";
 import { Car, Wrench, Package, CheckCircle2, User, FileText, HardHat, FileCheck, Search, Clock, Printer, Edit3, ShieldCheck, MessageCircle, ChevronDown, X, Save, Gauge, AlignLeft, Settings, Trash2, History } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +43,7 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
   const [customerNotes, setCustomerNotes] = useState("");
   const [warrantyText, setWarrantyText] = useState("");
   const [discount, setDiscount] = useState(0);
-  const [advancePayment, setAdvancePayment] = useState(0); // <-- NOVO ESTADO
+  const [advancePayment, setAdvancePayment] = useState(0);
   const [items, setItems] = useState<any[]>([]);
   const [mechanics, setMechanics] = useState<any[]>([]);
 
@@ -120,7 +120,7 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
     setCustomerNotes(os.customerNotes || "");
     setWarrantyText(os.warrantyText || "");
     setDiscount(os.discount || 0);
-    setAdvancePayment(os.advancePayment || 0); // <-- Adicionado Adiantamento
+    setAdvancePayment(os.advancePayment || 0); 
     setItems(os.items.map((i: any) => ({ ...i })));
     setMechanics(os.mechanics.map((m: any) => ({ id: m.id, employeeId: m.employeeId, task: m.task })));
     setIsEditing(false); 
@@ -183,6 +183,20 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
       setOrders(orders.map(o => o.id === os.id ? updatedOrder : o));
       setSelectedOS(updatedOrder);
     } catch { toast.error("Erro ao atualizar o status da OS."); }
+  };
+
+  const handleDeleteOS = async (e: any, os: any) => {
+    if (e) e.stopPropagation();
+    if (!confirm(`⚠️ ALERTA: Tem certeza que deseja EXCLUIR a OS #${os.number}?\n\nEsta ação é irreversível e apagará todo o histórico da ordem.`)) return;
+
+    try {
+      await deleteOrder(os.id);
+      toast.success("OS excluída com sucesso!");
+      setOrders(orders.filter(o => o.id !== os.id));
+      if (openViewOS) setOpenViewOS(false);
+    } catch {
+      toast.error("Erro ao excluir a OS.");
+    }
   };
 
   const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
@@ -393,9 +407,16 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
               {!isEditing && (
                 <>
-                  <Button variant="outline" onClick={(e) => { e.stopPropagation(); setTimeout(() => { if (handlePrint) handlePrint(); }, 300); }}><Printer className="w-4 h-4 mr-2" /> Imprimir</Button>
-                  <Button variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-500/10 dark:border-blue-500/20" onClick={() => setIsEditing(true)}>
-                    <Edit3 className="w-4 h-4 mr-2" /> Editar OS
+                  <Button variant="outline" onClick={(e) => { e.stopPropagation(); setTimeout(() => { if (handlePrint) handlePrint(); }, 300); }}><Printer className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">Imprimir</span></Button>
+                  
+                  {selectedOS?.status !== "COMPLETED" && (
+                    <Button variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-500/10 dark:border-blue-500/20" onClick={() => setIsEditing(true)}>
+                      <Edit3 className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">Editar OS</span>
+                    </Button>
+                  )}
+                  
+                  <Button variant="outline" className="text-red-600 border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:border-red-500/20" onClick={(e) => handleDeleteOS(e, selectedOS)}>
+                    <Trash2 className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">Excluir</span>
                   </Button>
                 </>
               )}
@@ -607,13 +628,11 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
             <div className="flex flex-wrap items-center gap-4 md:gap-8 text-sm text-zinc-400 w-full sm:w-auto">
               <div><p className="text-[10px] font-bold uppercase mb-1">Peças</p><p className="text-lg md:text-xl text-white font-bold">{formatBRL(partsTotal)}</p></div>
               <div className="border-l border-zinc-700 pl-4 md:pl-8"><p className="text-[10px] font-bold uppercase mb-1">Serviços</p><p className="text-lg md:text-xl text-white font-bold">{formatBRL(laborTotal)}</p></div>
-              
               <div className="border-l border-zinc-700 pl-4 md:pl-8">
                 <p className="text-[10px] font-bold uppercase mb-1 text-emerald-400">Desconto (R$)</p>
                 <Input type="number" value={discount} onChange={e => setDiscount(parseFloat(e.target.value) || 0)} className={`w-24 h-8 ${!isEditing ? 'bg-transparent' : 'bg-white/10'} border-0 text-white font-bold text-base px-2`} readOnly={!isEditing} />
               </div>
 
-              {/* NOVO: CAMPO DE ADIANTAMENTO / SINAL */}
               <div className="border-l border-zinc-700 pl-4 md:pl-8 relative">
                 <div className="flex items-center gap-2 mb-1">
                   <p className="text-[10px] font-bold uppercase text-yellow-400">Sinal / Adiant.</p>

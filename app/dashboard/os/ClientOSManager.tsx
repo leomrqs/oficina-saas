@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { createOrder, updateOrderStatus, updateOrderDetails } from "@/actions/os";
+import { createOrder, updateOrderStatus, updateOrderDetails, deleteOrder } from "@/actions/os";
 import { toast } from "sonner";
 import { useReactToPrint } from "react-to-print";
 
@@ -185,7 +185,6 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     if (e) e.stopPropagation();
     if (!os.customer.phone) { toast.error("Cliente sem telefone."); return; }
     
-    // Montagem da mensagem focada na clareza financeira
     let financeMsg = `\nTotal do Orçamento: *${formatBRL(os.total)}*`;
     if (os.status !== "COMPLETED" && os.advancePayment > 0) {
       financeMsg += `\nSinal Recebido: *${formatBRL(os.advancePayment)}*`;
@@ -243,6 +242,19 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
       toast.error("Erro ao atualizar o status da OS.");
     }
   }, [handleCompleteOS]);
+
+  const handleDeleteOS = useCallback(async (e: any, os: any) => {
+    if (e) e.stopPropagation();
+    if (!confirm(`⚠️ ALERTA: Tem certeza que deseja EXCLUIR a OS #${os.number}?\n\nEsta ação é irreversível e apagará todo o histórico da ordem.`)) return;
+
+    try {
+      await deleteOrder(os.id);
+      toast.success("OS excluída com sucesso!");
+      if (openViewOS) setOpenViewOS(false);
+    } catch {
+      toast.error("Erro ao excluir a OS.");
+    }
+  }, [openViewOS]);
 
 
   const memoizedPDF = useMemo(() => {
@@ -339,7 +351,6 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
               </div>
             )}
             
-            {/* NOVO: PDF EXPLICITANDO O PAGAMENTO E O RESTANTE */}
             <div className="flex justify-between px-4 py-2 bg-zinc-200 text-zinc-900 border-b border-zinc-300">
               <span className="text-sm font-black uppercase tracking-wider">Total</span>
               <span className="text-sm font-black">{formatBRL(selectedOS.total)}</span>
@@ -424,7 +435,6 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
               </TableCell>
               <TableCell className="max-w-[250px] truncate text-sm text-zinc-600 dark:text-zinc-400">{os.problem || "Não informado"}</TableCell>
               
-              {/* NOVO: VISUALIZAÇÃO CLARA DE SINAL NA TABELA */}
               <TableCell className="text-right">
                 <p className="font-black text-zinc-900 dark:text-zinc-100 text-base">{formatBRL(os.total)}</p>
                 
@@ -452,6 +462,10 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                   <Button variant="ghost" size="icon" className="text-green-600 hover:bg-green-50 dark:text-green-500 dark:hover:bg-green-950/30" onClick={(e) => handleWhatsApp(e, os)} title="Enviar WhatsApp"><MessageCircle className="w-4 h-4"/> </Button>
                   
                   <Button variant="ghost" size="icon" className="text-blue-600 hover:bg-blue-50 dark:text-blue-500 dark:hover:bg-blue-950/30" onClick={(e) => triggerPDFPrint(e, os)} title="Imprimir PDF"><Printer className="w-4 h-4"/></Button>
+
+                  <Button variant="ghost" size="icon" className="text-red-600 hover:bg-red-50 dark:text-red-500 dark:hover:bg-red-950/30" onClick={(e) => handleDeleteOS(e, os)} title="Excluir OS">
+                    <Trash2 className="w-4 h-4"/>
+                  </Button>
                 </div>
               </TableCell>
             </TableRow>
@@ -459,7 +473,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
         </TableBody>
       </Table>
     </div>
-  ), [filteredOrders, openOSDetails, handleCompleteOS, handleWhatsApp, triggerPDFPrint]);
+  ), [filteredOrders, openOSDetails, handleCompleteOS, handleWhatsApp, triggerPDFPrint, handleDeleteOS]);
 
   return (
     <div className="space-y-6">
@@ -551,18 +565,22 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
 
               {openViewOS && !isEditing && (
                 <>
-                  <Button variant="outline" onClick={(e) => triggerPDFPrint(e, selectedOS)}><Printer className="w-4 h-4 mr-2" /> Imprimir</Button>
+                  <Button variant="outline" onClick={(e) => triggerPDFPrint(e, selectedOS)}><Printer className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">Imprimir</span></Button>
 
                   {selectedOS?.status !== "COMPLETED" && (
                     <Button variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:border-blue-500/20" onClick={() => setIsEditing(true)}>
-                      <Edit3 className="w-4 h-4 mr-2" /> Editar OS
+                      <Edit3 className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">Editar OS</span>
                     </Button>
                   )}
                   {selectedOS?.status !== "COMPLETED" && (
                     <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={(e) => handleCompleteOS(e, selectedOS)}>
-                      <ShieldCheck className="w-4 h-4 mr-2" /> Finalizar no Caixa
+                      <ShieldCheck className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">Finalizar</span>
                     </Button>
                   )}
+
+                  <Button variant="outline" className="text-red-600 border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:border-red-500/20" onClick={(e) => handleDeleteOS(e, selectedOS)}>
+                    <Trash2 className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">Excluir</span>
+                  </Button>
                 </>
               )}
 
