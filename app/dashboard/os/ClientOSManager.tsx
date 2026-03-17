@@ -207,14 +207,10 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     }
   };
 
-  // =========================================================================
-  // NOVA FUNÇÃO: ALTERAÇÃO DINÂMICA DE STATUS VIA DROPDOWN
-  // =========================================================================
   const handleStatusChange = async (e: any, os: any, newStatus: string) => {
     if (e) e.stopPropagation();
-    if (os.status === newStatus) return; // Ignora se for o mesmo status
+    if (os.status === newStatus) return; 
 
-    // Se estiver mudando para COMPLETED, usa a função que avisa sobre o Caixa Financeiro
     if (newStatus === "COMPLETED") {
       return handleCompleteOS(e, os);
     }
@@ -222,7 +218,6 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     try {
       await updateOrderStatus(os.id, newStatus as any);
       toast.success("Status atualizado com sucesso!");
-      // Atualiza o estado local para a UI refletir a mudança instantaneamente sem fechar o modal
       setSelectedOS({ ...os, status: newStatus });
     } catch {
       toast.error("Erro ao atualizar o status da OS.");
@@ -232,7 +227,6 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
   return (
     <div className="space-y-6">
       
-      {/* TELA INVISÍVEL DO PDF */}
       <div style={{ display: "none" }}>
         <div ref={printRef} className="print-wrapper">
           {selectedOS && (
@@ -362,7 +356,6 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
         </div>
       </div>
 
-      {/* CABEÇALHO E BUSCA DA PÁGINA */}
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -373,63 +366,70 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
         </Button>
       </div>
 
-      {/* MODAL ÚNICO E INTELIGENTE: CRIAÇÃO / VISUALIZAÇÃO / EDIÇÃO */}
       <Dialog open={openNewOS || openViewOS} onOpenChange={(open) => {
         if (!open) { setOpenNewOS(false); setOpenViewOS(false); setIsEditing(false); }
       }}>
         <DialogContent className="sm:max-w-[1200px] !max-w-[1200px] w-[95vw] max-h-[95vh] flex flex-col p-0 overflow-hidden bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-xl">
           
           <div className="px-6 py-4 md:px-8 md:py-5 border-b dark:border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-zinc-900 shrink-0 z-10 shadow-sm">
-            <div>
-              <DialogTitle className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                {openNewOS ? (
-                  <><Wrench className="w-5 h-5 text-blue-600"/> Abertura de Orçamento</>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <span>OS #{selectedOS?.number}</span>
-                    {/* DROPDOWN MENU PARA MUDANÇA RÁPIDA DE STATUS */}
-                    {openViewOS && !isEditing ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger className="focus:outline-none flex items-center gap-1 hover:opacity-80 transition-opacity cursor-pointer">
-                          {getStatusBadge(selectedOS?.status)}
-                          <ChevronDown className="w-4 h-4 text-zinc-400" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="dark:bg-zinc-900 dark:border-zinc-800 p-2">
-                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "PENDING")}>
-                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-yellow-500"></div> Orçamento</div>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "APPROVED")}>
-                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-sky-500"></div> Aprovado</div>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "WAITING_PARTS")}>
-                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-red-500"></div> Aguardando Peça</div>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "IN_PROGRESS")}>
-                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-purple-500"></div> No Elevador</div>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "READY")}>
-                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-teal-500"></div> Pronto / Retirada</div>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "COMPLETED")}>
-                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Finalizada</div>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600 focus:text-red-600 cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "CANCELED")}>
-                            <div className="flex items-center gap-2 font-medium"><div className="w-2 h-2 rounded-full bg-zinc-500"></div> Cancelada</div>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : (
-                      <span className="text-sm font-normal">{getStatusBadge(selectedOS?.status)}</span>
-                    )}
-                  </div>
-                )}
-              </DialogTitle>
-              <p className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                {openNewOS ? "Preencha o checklist, atrele mecânicos e lance as peças." : (isEditing ? "Modo de Edição ativado. Faça suas alterações." : "Visualizando detalhes do Orçamento / Serviço.")}
-              </p>
+            
+            {/* NOVO: Flexbox que divide o título e o Botão X no Mobile */}
+            <div className="flex justify-between items-start w-full sm:w-auto">
+              <div>
+                <DialogTitle className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  {openNewOS ? (
+                    <><Wrench className="w-5 h-5 text-blue-600"/> Abertura de Orçamento</>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <span>OS #{selectedOS?.number}</span>
+                      {openViewOS && !isEditing ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="focus:outline-none flex items-center gap-1 hover:opacity-80 transition-opacity cursor-pointer">
+                            {getStatusBadge(selectedOS?.status)}
+                            <ChevronDown className="w-4 h-4 text-zinc-400" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start" className="dark:bg-zinc-900 dark:border-zinc-800 p-2">
+                            <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "PENDING")}>
+                              <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-yellow-500"></div> Orçamento</div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "APPROVED")}>
+                              <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-sky-500"></div> Aprovado</div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "WAITING_PARTS")}>
+                              <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-red-500"></div> Aguardando Peça</div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "IN_PROGRESS")}>
+                              <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-purple-500"></div> No Elevador</div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "READY")}>
+                              <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-teal-500"></div> Pronto / Retirada</div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "COMPLETED")}>
+                              <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Finalizada</div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-red-600 focus:text-red-600 cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "CANCELED")}>
+                              <div className="flex items-center gap-2 font-medium"><div className="w-2 h-2 rounded-full bg-zinc-500"></div> Cancelada</div>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : (
+                        <span className="text-sm font-normal">{getStatusBadge(selectedOS?.status)}</span>
+                      )}
+                    </div>
+                  )}
+                </DialogTitle>
+                <p className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                  {openNewOS ? "Preencha o checklist, atrele mecânicos e lance as peças." : (isEditing ? "Modo de Edição ativado. Faça suas alterações." : "Visualizando detalhes do Orçamento / Serviço.")}
+                </p>
+              </div>
+
+              {/* Botão de Fechar Exclusivo para Mobile */}
+              <Button variant="ghost" size="icon" className="sm:hidden text-zinc-500 -mr-2 -mt-2 hover:bg-zinc-100 dark:hover:bg-zinc-800" onClick={() => { setOpenNewOS(false); setOpenViewOS(false); setIsEditing(false); }}>
+                <X className="w-6 h-6" />
+              </Button>
             </div>
+
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-              
               {openNewOS && (
                 <>
                   <Button variant="outline" onClick={() => setOpenNewOS(false)} className="dark:border-zinc-700">Cancelar</Button>
@@ -562,7 +562,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
               </div>
             </div>
 
-            <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl shadow-sm overflow-hidden mb-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 md:p-5 border-b dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50 gap-4">
                 <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">Lançamento de Itens</h3>
                 {(isEditing || openNewOS) && (
@@ -597,8 +597,8 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                       )}
                     </div>
                     <div className="flex gap-3 w-full md:w-auto items-end">
-                      <div className="w-20 space-y-1.5 shrink-0"><label className="text-[10px] uppercase font-bold text-zinc-500">Qtd</label><Input className={`h-10 text-center font-bold ${!isEditing && !openNewOS ? 'bg-transparent border-dashed' : 'bg-white'}`} type="number" min="1" value={item.quantity} onChange={e => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)} readOnly={!isEditing && !openNewOS} /></div>
-                      <div className="flex-1 md:w-32 space-y-1.5"><label className="text-[10px] uppercase font-bold text-zinc-500">Unitário</label><Input className={`h-10 ${!isEditing && !openNewOS ? 'bg-transparent border-dashed' : 'bg-white'}`} type="number" step="0.01" value={item.unitPrice} onChange={e => updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)} readOnly={!isEditing && !openNewOS} /></div>
+                      <div className="w-20 space-y-1.5 shrink-0"><label className="text-[10px] uppercase font-bold text-zinc-500">Qtd</label><Input className={`h-10 text-center font-bold ${!isEditing && !openNewOS ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'}`} type="number" min="1" value={item.quantity} onChange={e => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)} readOnly={!isEditing && !openNewOS} /></div>
+                      <div className="flex-1 md:w-32 space-y-1.5"><label className="text-[10px] uppercase font-bold text-zinc-500">Unitário</label><Input className={`h-10 ${!isEditing && !openNewOS ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'}`} type="number" step="0.01" value={item.unitPrice} onChange={e => updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)} readOnly={!isEditing && !openNewOS} /></div>
                       <div className="flex-1 md:w-36 space-y-1.5"><label className="text-[10px] uppercase font-bold text-zinc-500">Total</label><div className={`h-10 flex items-center px-3 border dark:border-zinc-800 rounded-md font-bold text-sm ${!isEditing && !openNewOS ? 'bg-transparent border-dashed' : 'bg-zinc-100 dark:bg-zinc-900'}`}>{formatBRL(item.total)}</div></div>
                       {(isEditing || openNewOS) && <Button variant="ghost" size="icon" className="h-10 w-10 shrink-0 text-red-500 hover:bg-red-50 dark:hover:bg-red-950" onClick={() => setItems(items.filter(i => i.id !== item.id))}><Trash2 className="w-4 h-4"/></Button>}
                     </div>
@@ -625,7 +625,6 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
         </DialogContent>
       </Dialog>
 
-      {/* TABELA PRINCIPAL DA TELA */}
       <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-lg shadow-sm overflow-hidden">
         <Table>
           <TableHeader className="bg-zinc-50 dark:bg-zinc-950/50">

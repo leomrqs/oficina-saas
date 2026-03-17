@@ -138,7 +138,6 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
       const fullCustomer = customers.find((c: any) => c.id === selectedCustomer);
       const fullVehicle = customerVehicles.find((v: any) => v.id === selectedVehicle);
 
-      // Cria um log otimista local para aparecer na hora
       const tempLog = { id: Math.random().toString(), newStatus: selectedOS.status, notes: "Detalhes atualizados manualmente.", createdAt: new Date() };
 
       setOrders(orders.map(o => o.id === selectedOS.id ? { 
@@ -320,46 +319,59 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
         <DialogContent className="sm:max-w-[1200px] !max-w-[1200px] w-[95vw] max-h-[95vh] flex flex-col p-0 overflow-hidden bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-xl">
           
           <div className="px-6 py-4 md:px-8 md:py-5 border-b dark:border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-zinc-900 shrink-0 z-10 shadow-sm">
-            <div>
-              <DialogTitle className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                <div className="flex items-center gap-3">
-                  <span>OS #{selectedOS?.number}</span>
-                  {!isEditing ? (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="focus:outline-none flex items-center gap-1 hover:opacity-80 transition-opacity cursor-pointer">
-                        {getStatusBadge(selectedOS?.status)}
-                        <ChevronDown className="w-4 h-4 text-zinc-400" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="dark:bg-zinc-900 dark:border-zinc-800 p-2">
-                        <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "PENDING")}>
-                          <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-yellow-500"></div> Orçamento</div>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "APPROVED")}>
-                          <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-sky-500"></div> Aprovado</div>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "WAITING_PARTS")}>
-                          <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-red-500"></div> Aguardando Peça</div>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "IN_PROGRESS")}>
-                          <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-purple-500"></div> No Elevador</div>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "READY")}>
-                          <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-teal-500"></div> Pronto / Retirada</div>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "COMPLETED")}>
-                          <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Finalizada no Caixa</div>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600 focus:text-red-600 cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "CANCELED")}>
-                          <div className="flex items-center gap-2 font-medium"><div className="w-2 h-2 rounded-full bg-zinc-500"></div> Cancelada</div>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ) : (
-                    <span className="text-sm font-normal">{getStatusBadge(selectedOS?.status)}</span>
-                  )}
-                </div>
-              </DialogTitle>
+            
+            {/* NOVO: Flexbox que divide o título e o Botão X no Mobile */}
+            <div className="flex justify-between items-start w-full sm:w-auto">
+              <div>
+                <DialogTitle className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <span>OS #{selectedOS?.number}</span>
+                    {!isEditing ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="focus:outline-none flex items-center gap-1 hover:opacity-80 transition-opacity cursor-pointer">
+                          {getStatusBadge(selectedOS?.status)}
+                          <ChevronDown className="w-4 h-4 text-zinc-400" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="dark:bg-zinc-900 dark:border-zinc-800 p-2">
+                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "PENDING")}>
+                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-yellow-500"></div> Orçamento</div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "APPROVED")}>
+                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-sky-500"></div> Aprovado</div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "WAITING_PARTS")}>
+                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-red-500"></div> Aguardando Peça</div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "IN_PROGRESS")}>
+                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-purple-500"></div> No Elevador</div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "READY")}>
+                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-teal-500"></div> Pronto / Retirada</div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "COMPLETED")}>
+                            <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Finalizada</div>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600 focus:text-red-600 cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "CANCELED")}>
+                            <div className="flex items-center gap-2 font-medium"><div className="w-2 h-2 rounded-full bg-zinc-500"></div> Cancelada</div>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <span className="text-sm font-normal">{getStatusBadge(selectedOS?.status)}</span>
+                    )}
+                  </div>
+                </DialogTitle>
+                <p className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                  {isEditing ? "Modo de Edição ativado. Faça suas alterações." : "Visualizando detalhes da OS direto do Pátio."}
+                </p>
+              </div>
+
+              {/* Botão de Fechar Exclusivo para Mobile */}
+              <Button variant="ghost" size="icon" className="sm:hidden text-zinc-500 -mr-2 -mt-2 hover:bg-zinc-100 dark:hover:bg-zinc-800" onClick={() => { setOpenViewOS(false); setIsEditing(false); }}>
+                <X className="w-6 h-6" />
+              </Button>
             </div>
+
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
               {!isEditing && (
                 <>
@@ -531,7 +543,6 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
                 </div>
               </TabsContent>
 
-              {/* ABA 2: A NOVA AUDITORIA DE STATUS */}
               <TabsContent value="auditoria" className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 m-0 border-0 focus-visible:outline-none">
                 <div className="max-w-2xl mx-auto">
                   <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-6 flex items-center gap-2">
@@ -591,7 +602,6 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
         </DialogContent>
       </Dialog>
       
-      {/* Componente de Impressão */}
       <div style={{ display: "none" }}><div ref={printRef}></div></div>
     </div>
   );
