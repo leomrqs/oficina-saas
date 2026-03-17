@@ -1,8 +1,8 @@
 // app/dashboard/os/ClientOSManager.tsx
 "use client";
 
-import { useState, useMemo, useRef, useCallback } from "react";
-import { Search, Plus, Trash2, FileText, Printer, MessageCircle, Settings, Car, Gauge, ShieldCheck, AlignLeft, HardHat, Wrench, Eye, Edit3, X, Save, CheckCircle2, ChevronDown } from "lucide-react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { Search, Plus, Trash2, FileText, Printer, MessageCircle, Settings, Car, Gauge, ShieldCheck, AlignLeft, HardHat, Wrench, Eye, Edit3, X, Save, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Filter, ArrowUp, ArrowDown, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,7 +32,13 @@ const getStatusBadge = (status: string) => {
 };
 
 export function ClientOSManager({ initialOrders, customers, products, tenant, employees }: { initialOrders: any[], customers: any[], products: any[], tenant: any, employees: any[] }) {
+  // Filtros e Paginação
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [sortOrder, setSortOrder] = useState("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+
   const [openNewOS, setOpenNewOS] = useState(false);
   const [openViewOS, setOpenViewOS] = useState(false); 
   const [isEditing, setIsEditing] = useState(false); 
@@ -45,13 +51,39 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     documentTitle: `OS_${selectedOS?.number || '000'}`,
   } as any);
 
-  const filteredOrders = useMemo(() => {
-    return initialOrders.filter(o => 
-      o.number.toString().includes(searchTerm) ||
-      o.customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      o.vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [initialOrders, searchTerm]);
+  // Reseta para a página 1 sempre que os filtros mudarem
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, sortOrder]);
+
+  // Aplica Filtros e Ordenação
+  const filteredAndSortedOrders = useMemo(() => {
+    let result = initialOrders.filter(o => {
+      const matchSearch = 
+        o.number.toString().includes(searchTerm) ||
+        o.customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        o.vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchStatus = statusFilter === "ALL" || o.status === statusFilter;
+      
+      return matchSearch && matchStatus;
+    });
+
+    result.sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime(); // Ordenando pela data de criação
+      const dateB = new Date(b.createdAt).getTime();
+      return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
+    });
+
+    return result;
+  }, [initialOrders, searchTerm, statusFilter, sortOrder]);
+
+  // Aplica Paginação
+  const totalPages = Math.ceil(filteredAndSortedOrders.length / ITEMS_PER_PAGE);
+  const paginatedOrders = filteredAndSortedOrders.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const [selectedCustomer, setSelectedCustomerId] = useState("");
   const [selectedVehicle, setSelectedVehicleId] = useState("");
@@ -408,32 +440,37 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
       <Table>
         <TableHeader className="bg-zinc-50 dark:bg-zinc-950/50">
           <TableRow className="dark:border-zinc-800">
-            <TableHead className="dark:text-zinc-400">Número & Status</TableHead>
+            <TableHead className="dark:text-zinc-400">OS & Data</TableHead>
             <TableHead className="dark:text-zinc-400">Cliente / Veículo</TableHead>
-            <TableHead className="dark:text-zinc-400">Problema Relatado</TableHead>
+            <TableHead className="dark:text-zinc-400 hidden md:table-cell">Problema Relatado</TableHead>
             <TableHead className="text-right dark:text-zinc-400">Total / Saldo</TableHead>
             <TableHead className="text-right dark:text-zinc-400">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredOrders.length === 0 && (
-            <TableRow><TableCell colSpan={5} className="text-center py-12 text-zinc-500">Nenhum orçamento encontrado.</TableCell></TableRow>
+          {paginatedOrders.length === 0 && (
+            <TableRow><TableCell colSpan={5} className="text-center py-12 text-zinc-500">Nenhum registro de OS encontrado para estes filtros.</TableCell></TableRow>
           )}
-          {filteredOrders.map(os => {
+          {paginatedOrders.map(os => {
             const isCompleted = os.status === "COMPLETED";
             const hasAdvance = os.advancePayment > 0;
             
             return (
             <TableRow key={os.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/50 dark:border-zinc-800 cursor-pointer" onClick={() => openOSDetails(os)}>
               <TableCell>
-                <p className="font-bold text-zinc-900 dark:text-zinc-100 text-base">OS #{os.number}</p>
-                <div className="mt-1">{getStatusBadge(os.status)}</div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <p className="font-bold text-zinc-900 dark:text-zinc-100 text-base">#{os.number}</p>
+                  <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <CalendarClock className="w-3 h-3"/> {new Date(os.createdAt).toLocaleDateString('pt-BR')}
+                  </span>
+                </div>
+                <div>{getStatusBadge(os.status)}</div>
               </TableCell>
               <TableCell>
-                <p className="font-bold text-sm text-zinc-900 dark:text-zinc-100 truncate max-w-[200px]">{os.customer.name}</p>
+                <p className="font-bold text-sm text-zinc-900 dark:text-zinc-100 truncate max-w-[150px] md:max-w-[200px]">{os.customer.name}</p>
                 <p className="text-xs font-mono text-zinc-500 mt-1">{os.vehicle.plate} - {os.vehicle.brand}</p>
               </TableCell>
-              <TableCell className="max-w-[250px] truncate text-sm text-zinc-600 dark:text-zinc-400">{os.problem || "Não informado"}</TableCell>
+              <TableCell className="max-w-[250px] truncate text-sm text-zinc-600 dark:text-zinc-400 hidden md:table-cell">{os.problem || "Não informado"}</TableCell>
               
               <TableCell className="text-right">
                 <p className="font-black text-zinc-900 dark:text-zinc-100 text-base">{formatBRL(os.total)}</p>
@@ -459,10 +496,8 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                     </Button>
                   )}
                   
-                  <Button variant="ghost" size="icon" className="text-green-600 hover:bg-green-50 dark:text-green-500 dark:hover:bg-green-950/30" onClick={(e) => handleWhatsApp(e, os)} title="Enviar WhatsApp"><MessageCircle className="w-4 h-4"/> </Button>
-                  
-                  <Button variant="ghost" size="icon" className="text-blue-600 hover:bg-blue-50 dark:text-blue-500 dark:hover:bg-blue-950/30" onClick={(e) => triggerPDFPrint(e, os)} title="Imprimir PDF"><Printer className="w-4 h-4"/></Button>
-
+                  <Button variant="ghost" size="icon" className="text-green-600 hover:bg-green-50 dark:text-green-500 dark:hover:bg-green-950/30 hidden sm:inline-flex" onClick={(e) => handleWhatsApp(e, os)} title="Enviar WhatsApp"><MessageCircle className="w-4 h-4"/> </Button>
+                  <Button variant="ghost" size="icon" className="text-blue-600 hover:bg-blue-50 dark:text-blue-500 dark:hover:bg-blue-950/30 hidden sm:inline-flex" onClick={(e) => triggerPDFPrint(e, os)} title="Imprimir PDF"><Printer className="w-4 h-4"/></Button>
                   <Button variant="ghost" size="icon" className="text-red-600 hover:bg-red-50 dark:text-red-500 dark:hover:bg-red-950/30" onClick={(e) => handleDeleteOS(e, os)} title="Excluir OS">
                     <Trash2 className="w-4 h-4"/>
                   </Button>
@@ -472,8 +507,40 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
           )})}
         </TableBody>
       </Table>
+      
+      {/* CONTROLES DE PAGINAÇÃO */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 border-t dark:border-zinc-800 gap-4 bg-zinc-50/50 dark:bg-zinc-950/50">
+          <span className="text-sm text-zinc-500 dark:text-zinc-400">
+            Mostrando {paginatedOrders.length} de {filteredAndSortedOrders.length} registros
+          </span>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
+              disabled={currentPage === 1}
+              className="dark:border-zinc-700 bg-white dark:bg-zinc-900"
+            >
+              <ChevronLeft className="w-4 h-4 mr-1" /> Anterior
+            </Button>
+            <span className="text-sm font-medium px-2 dark:text-zinc-300">
+              Página {currentPage} de {totalPages}
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
+              disabled={currentPage === totalPages}
+              className="dark:border-zinc-700 bg-white dark:bg-zinc-900"
+            >
+              Próxima <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
-  ), [filteredOrders, openOSDetails, handleCompleteOS, handleWhatsApp, triggerPDFPrint, handleDeleteOS]);
+  ), [paginatedOrders, filteredAndSortedOrders.length, currentPage, totalPages, openOSDetails, handleCompleteOS, handleWhatsApp, triggerPDFPrint, handleDeleteOS]);
 
   return (
     <div className="space-y-6">
@@ -484,12 +551,75 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
         </div>
       </div>
 
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div className="relative w-full sm:max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-          <Input placeholder="Buscar OS, placa ou cliente..." className="pl-9 bg-white dark:bg-zinc-900 dark:border-zinc-800 shadow-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+      {/* ÁREA SUPERIOR: BUSCA, FILTROS E BOTÃO NOVO */}
+      <div className="flex flex-col xl:flex-row justify-between gap-4 mb-4">
+        <div className="flex flex-col sm:flex-row flex-1 gap-3">
+          
+          <div className="relative w-full xl:max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+            <Input 
+              placeholder="Buscar OS, placa ou cliente..." 
+              className="pl-9 bg-white dark:bg-zinc-900 dark:border-zinc-800 shadow-sm w-full" 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+            />
+          </div>
+
+          <div className="flex gap-2 w-full xl:w-auto">
+            {/* Filtro de Status com Bolinhas Coloridas */}
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="flex-1 sm:w-[220px] bg-white dark:bg-zinc-900 dark:border-zinc-800 shadow-sm font-medium">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-zinc-400" />
+                  <SelectValue placeholder="Status da OS" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="dark:bg-zinc-900 dark:border-zinc-800">
+                <SelectItem value="ALL" className="font-bold">
+                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-zinc-300 dark:bg-zinc-600"></div> Todos os Status</div>
+                </SelectItem>
+                <SelectItem value="PENDING">
+                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-yellow-500"></div> Orçamentos</div>
+                </SelectItem>
+                <SelectItem value="APPROVED">
+                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-sky-500"></div> Aprovados</div>
+                </SelectItem>
+                <SelectItem value="WAITING_PARTS">
+                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-red-500"></div> Aguardando Peça</div>
+                </SelectItem>
+                <SelectItem value="IN_PROGRESS">
+                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-purple-500"></div> No Elevador</div>
+                </SelectItem>
+                <SelectItem value="READY">
+                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-teal-500"></div> Pronto / Retirada</div>
+                </SelectItem>
+                <SelectItem value="COMPLETED">
+                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Finalizadas</div>
+                </SelectItem>
+                <SelectItem value="CANCELED">
+                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-zinc-500"></div> Canceladas</div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Ordenação por Data com Setas */}
+            <Select value={sortOrder} onValueChange={setSortOrder}>
+              <SelectTrigger className="flex-1 sm:w-[170px] bg-white dark:bg-zinc-900 dark:border-zinc-800 shadow-sm font-medium">
+                <SelectValue placeholder="Ordem" />
+              </SelectTrigger>
+              <SelectContent className="dark:bg-zinc-900 dark:border-zinc-800">
+                <SelectItem value="desc">
+                  <div className="flex items-center gap-2"><ArrowDown className="w-4 h-4 text-zinc-400"/> Mais Recentes</div>
+                </SelectItem>
+                <SelectItem value="asc">
+                  <div className="flex items-center gap-2"><ArrowUp className="w-4 h-4 text-zinc-400"/> Mais Antigas</div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <Button className="shadow-sm bg-blue-600 hover:bg-blue-700 text-white" onClick={handleOpenNewOS}>
+
+        <Button className="shadow-sm bg-blue-600 hover:bg-blue-700 text-white w-full xl:w-auto" onClick={handleOpenNewOS}>
           <Plus className="mr-2 h-4 w-4" /> Novo Orçamento
         </Button>
       </div>
