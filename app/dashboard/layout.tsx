@@ -20,37 +20,37 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   }
 
   const tenantId = session.user.tenantId;
-  const role = session.user.role; // Pega o cargo do usuário logado
+  const role = session.user.role; 
 
-  // ---------------------------------------------------------------------------
-  // CÁLCULO DA BARRINHA DE META (SÓ EXECUTA SE FOR GERENTE/DONO)
-  // ---------------------------------------------------------------------------
   let revCurrent = 0;
   let targetGoal = 50000; 
+  let tenantName = "Oficina Parceira"; // Nome padrão caso algo falhe
 
-  if (tenantId && role === "MANAGER") {
-    // 1. Busca a meta real que está salva no banco
+  // Busca inteligente: Pegamos o nome da Oficina E a meta financeira numa só tacada
+  if (tenantId) {
     const tenantData = await prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { monthlyGoal: true }
+      select: { monthlyGoal: true, name: true }
     });
-    if (tenantData?.monthlyGoal) targetGoal = tenantData.monthlyGoal;
+    
+    if (tenantData) {
+      tenantName = tenantData.name;
+      if (tenantData.monthlyGoal) targetGoal = tenantData.monthlyGoal;
+    }
 
-    // 2. Soma as receitas do mês atual
-    const now = new Date();
-    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const currentMonthIncome = await prisma.financialTransaction.aggregate({
-      where: { tenantId, type: "INCOME", status: "PAID", paymentDate: { gte: startOfThisMonth } },
-      _sum: { amount: true }
-    });
-    revCurrent = currentMonthIncome._sum.amount || 0;
+    if (role === "MANAGER") {
+      const now = new Date();
+      const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const currentMonthIncome = await prisma.financialTransaction.aggregate({
+        where: { tenantId, type: "INCOME", status: "PAID", paymentDate: { gte: startOfThisMonth } },
+        _sum: { amount: true }
+      });
+      revCurrent = currentMonthIncome._sum.amount || 0;
+    }
   }
 
   const progressPercent = Math.min((revCurrent / targetGoal) * 100, 100);
 
-  // ---------------------------------------------------------------------------
-  // WIDGET MINIMALISTA (Apenas a Barrinha)
-  // ---------------------------------------------------------------------------
   const GoalWidget = () => (
     <div className="px-5 py-4 border-t border-zinc-200/60 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
       <div className="mb-2 flex items-center justify-between">
@@ -76,23 +76,34 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       {/* SIDEBAR DESKTOP FIXA NO ECRÃ */}
       <div className="hidden border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 md:flex flex-col sticky top-0 h-screen overflow-hidden">
         
-        <div className="flex h-14 items-center border-b border-zinc-200/60 dark:border-zinc-800 px-4 lg:h-[60px] lg:px-6 shrink-0">
-          <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-            <div className="bg-zinc-900 dark:bg-zinc-100 p-1.5 rounded-md">
-              <Wrench className="h-4 w-4 text-white dark:text-zinc-900" />
+        {/* CABEÇALHO ANIMADO E ROBUSTO (DESKTOP) */}
+        <div className="flex h-[72px] items-center border-b border-zinc-200/60 dark:border-zinc-800 px-5 shrink-0 bg-zinc-50/30 dark:bg-zinc-950/50">
+          <Link href="/dashboard" className="flex items-center gap-3 font-semibold group w-full">
+            
+            {/* Ícone Animado */}
+            <div className="relative flex items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-600 p-2 rounded-xl shadow-md group-hover:shadow-blue-500/30 transition-all duration-300 group-hover:scale-105 shrink-0">
+              <Wrench className="h-5 w-5 text-white group-hover:rotate-12 transition-transform duration-300" />
+              <div className="absolute inset-0 rounded-xl bg-white/20 animate-pulse opacity-0 group-hover:opacity-100 transition-opacity"></div>
             </div>
-            <span className="text-zinc-900 dark:text-zinc-100 tracking-tight">Oficina SaaS</span>
+            
+            {/* Tipografia Premium */}
+            <div className="flex flex-col overflow-hidden">
+              <span className="text-lg font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400">
+                Mecaniq<span className="text-blue-600 dark:text-blue-500">Control</span>
+              </span>
+              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest truncate w-full" title={tenantName}>
+                {tenantName}
+              </span>
+            </div>
           </Link>
         </div>
         
-        <div className="flex-1 overflow-y-auto py-4">
-          {/* Passamos o role para a Sidebar saber o que esconder */}
+        <div className="flex-1 overflow-y-auto py-6">
           <Sidebar role={role} />
         </div>
 
         {/* RODAPÉ DA SIDEBAR */}
         <div className="mt-auto flex flex-col shrink-0">
-          {/* SÓ MOSTRA A BARRINHA SE O CARGO FOR MANAGER */}
           {tenantId && role === "MANAGER" && <GoalWidget />}
           
           <div className="border-t border-zinc-200/60 dark:border-zinc-800 p-3 bg-white dark:bg-zinc-950 flex items-center justify-between gap-2">
@@ -110,27 +121,35 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         {/* HEADER MOBILE */}
         <header className="flex h-14 items-center gap-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-4 lg:h-[60px] lg:px-6 sticky top-0 z-10">
           <Sheet>
-            <SheetTrigger className="inline-flex items-center justify-center shrink-0 md:hidden h-10 w-10 border border-zinc-200 dark:border-zinc-800 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-900 bg-white dark:bg-zinc-950">
+            <SheetTrigger className="inline-flex items-center justify-center shrink-0 md:hidden h-10 w-10 border border-zinc-200 dark:border-zinc-800 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-900 bg-white dark:bg-zinc-950 transition-colors">
               <Menu className="h-5 w-5 text-zinc-900 dark:text-zinc-100" />
               <span className="sr-only">Abrir menu</span>
             </SheetTrigger>
             
-            <SheetContent side="left" className="flex flex-col h-full p-0 w-72 dark:bg-zinc-950 border-r-zinc-800">
-              <div className="p-4 border-b dark:border-zinc-800 shrink-0">
-                <SheetTitle className="flex items-center gap-2 font-semibold text-zinc-900 dark:text-zinc-100">
-                  <div className="bg-zinc-900 dark:bg-zinc-100 p-1.5 rounded-md">
-                    <Wrench className="h-4 w-4 text-white dark:text-zinc-900" />
+            <SheetContent side="left" className="flex flex-col h-full p-0 w-[280px] dark:bg-zinc-950 border-r-zinc-800">
+              
+              {/* CABEÇALHO ANIMADO E ROBUSTO (MOBILE) */}
+              <div className="p-5 border-b dark:border-zinc-800 shrink-0 bg-zinc-50/30 dark:bg-zinc-950/50">
+                <SheetTitle className="flex items-center gap-3 font-semibold group">
+                  <div className="relative flex items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-600 p-2 rounded-xl shadow-md">
+                    <Wrench className="h-5 w-5 text-white" />
                   </div>
-                  Oficina SaaS
+                  <div className="flex flex-col text-left overflow-hidden">
+                    <span className="text-lg font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400">
+                      Mecaniq<span className="text-blue-600 dark:text-blue-500">Control</span>
+                    </span>
+                    <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest truncate w-full">
+                      {tenantName}
+                    </span>
+                  </div>
                 </SheetTitle>
               </div>
               
-              <div className="flex-1 overflow-y-auto p-4">
+              <div className="flex-1 overflow-y-auto py-6">
                 <Sidebar role={role} />
               </div>
 
               <div className="mt-auto flex flex-col shrink-0">
-                {/* SÓ MOSTRA A BARRINHA SE O CARGO FOR MANAGER (No Mobile) */}
                 {tenantId && role === "MANAGER" && <GoalWidget />}
                 
                 <div className="border-t border-zinc-200/60 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-950 flex items-center justify-between gap-2">
@@ -146,7 +165,6 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           <div className="w-full flex-1" />
         </header>
 
-        {/* ÁREA DE CONTEÚDO ROLÁVEL */}
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-zinc-50/30 dark:bg-zinc-950/50">
           {children}
         </main>

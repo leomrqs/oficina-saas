@@ -37,12 +37,10 @@ export function Sidebar({ role }: { role?: string }) {
   const pathname = usePathname();
   const [isNavigating, setIsNavigating] = useState<string | null>(null);
   
-  // Limpa o spinner de carregamento assim que a URL muda e a página carrega
   useEffect(() => {
     setIsNavigating(null);
   }, [pathname]);
 
-  // LÓGICA DE RBAC
   let navItems = managerItems;
   if (role === "SUPER_ADMIN") {
     navItems = superAdminItems;
@@ -51,7 +49,7 @@ export function Sidebar({ role }: { role?: string }) {
   }
 
   return (
-    <nav className="grid items-start px-2 text-sm font-medium lg:px-4 space-y-1">
+    <nav className="grid items-start px-3 text-sm lg:px-4 space-y-1.5">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = pathname === item.href;
@@ -63,21 +61,27 @@ export function Sidebar({ role }: { role?: string }) {
             href={item.href}
             onClick={() => {
               if (pathname !== item.href) {
-                setIsNavigating(item.href); // Dispara o feedback na hora
+                setIsNavigating(item.href); 
               }
             }}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
+            className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-300 overflow-hidden ${
               isActive
-                ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50"
-                : "text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-900"
+                ? "bg-blue-50/80 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 font-bold shadow-sm"
+                : "text-zinc-600 hover:text-blue-600 hover:bg-blue-50/50 dark:text-zinc-400 dark:hover:text-blue-400 dark:hover:bg-zinc-900/80 font-medium hover:translate-x-1"
             }`}
           >
+            {/* Barra iluminada de aba ativa */}
+            {isActive && (
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 h-2/3 w-1 bg-blue-600 dark:bg-blue-500 rounded-r-full" />
+            )}
+
             {isLoading ? (
               <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
             ) : (
-              <Icon className="h-4 w-4" />
+              <Icon className={`h-4 w-4 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
             )}
-            {item.name}
+            
+            <span className="tracking-wide">{item.name}</span>
           </Link>
         );
       })}
