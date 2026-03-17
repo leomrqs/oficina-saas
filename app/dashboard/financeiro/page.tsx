@@ -48,10 +48,10 @@ export default async function FinanceiroPage() {
     <>
       <div className="flex items-center justify-between space-y-2 mb-6">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <DollarSign className="h-8 w-8 text-zinc-900" /> Gestão Financeira
+          <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2 dark:text-white">
+            <DollarSign className="h-8 w-8 text-zinc-900 dark:text-zinc-100" /> Gestão Financeira
           </h2>
-          <p className="text-zinc-500">Controle seu fluxo de caixa, contas fixas mensais e inadimplência.</p>
+          <p className="text-zinc-500 dark:text-zinc-400">Controle seu fluxo de caixa, contas fixas mensais e inadimplência.</p>
         </div>
       </div>
 
@@ -65,31 +65,31 @@ export default async function FinanceiroPage() {
           <p className="text-xs text-zinc-400 mt-2">Valores já liquidados hoje</p>
         </div>
 
-        <div className="bg-emerald-50/50 border border-emerald-100 p-5 rounded-xl shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
+        <div className="bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 p-5 rounded-xl shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
           <div className="flex justify-between items-start mb-2">
-            <p className="text-sm font-medium text-emerald-800 uppercase tracking-wider">A Receber</p>
-            <ArrowUpRight className="w-5 h-5 text-emerald-600" />
+            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-500 uppercase tracking-wider">A Receber</p>
+            <ArrowUpRight className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
           </div>
-          <p className="text-3xl font-black text-emerald-700 tracking-tight">{formatBRL(pendingIncome)}</p>
-          <p className="text-xs text-emerald-600/80 mt-2">OS aprovadas e pendentes</p>
+          <p className="text-3xl font-black text-emerald-700 dark:text-emerald-400 tracking-tight">{formatBRL(pendingIncome)}</p>
+          <p className="text-xs text-emerald-600/80 dark:text-emerald-500/80 mt-2">OS aprovadas e pendentes</p>
         </div>
 
-        <div className="bg-orange-50/50 border border-orange-100 p-5 rounded-xl shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
+        <div className="bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 p-5 rounded-xl shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
           <div className="flex justify-between items-start mb-2">
-            <p className="text-sm font-medium text-orange-800 uppercase tracking-wider">A Pagar (Previsão)</p>
-            <ArrowDownRight className="w-5 h-5 text-orange-600" />
+            <p className="text-sm font-medium text-orange-800 dark:text-orange-500 uppercase tracking-wider">A Pagar (Previsão)</p>
+            <ArrowDownRight className="w-5 h-5 text-orange-600 dark:text-orange-500" />
           </div>
-          <p className="text-3xl font-black text-orange-700 tracking-tight">{formatBRL(pendingExpense)}</p>
-          <p className="text-xs text-orange-600/80 mt-2">Contas e fornecedores</p>
+          <p className="text-3xl font-black text-orange-700 dark:text-orange-400 tracking-tight">{formatBRL(pendingExpense)}</p>
+          <p className="text-xs text-orange-600/80 dark:text-orange-500/80 mt-2">Contas e fornecedores</p>
         </div>
 
-        <div className="bg-red-50/50 border border-red-100 p-5 rounded-xl shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
+        <div className="bg-red-50/50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 p-5 rounded-xl shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
           <div className="flex justify-between items-start mb-2">
-            <p className="text-sm font-medium text-red-800 uppercase tracking-wider">Atrasos / Inadimplência</p>
-            <AlertCircle className="w-5 h-5 text-red-600" />
+            <p className="text-sm font-medium text-red-800 dark:text-red-500 uppercase tracking-wider">Atrasos / Inadimplência</p>
+            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-500" />
           </div>
-          <p className="text-3xl font-black text-red-600 tracking-tight">{formatBRL(latePayments)}</p>
-          <p className="text-xs text-red-500/80 mt-2 font-medium">Contas vencidas</p>
+          <p className="text-3xl font-black text-red-600 dark:text-red-500 tracking-tight">{formatBRL(latePayments)}</p>
+          <p className="text-xs text-red-500/80 dark:text-red-500/80 mt-2 font-medium">Contas vencidas</p>
         </div>
       </div>
 

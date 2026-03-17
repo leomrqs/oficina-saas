@@ -26,6 +26,7 @@ export async function createOrder(data: any) {
       laborTotal: data.laborTotal,
       partsTotal: data.partsTotal,
       discount: data.discount,
+      advancePayment: data.advancePayment || 0.0, // <-- Salvando Adiantamento
       total: data.total,
       status: "PENDING",
       tenantId: session.user.tenantId,
@@ -47,7 +48,6 @@ export async function createOrder(data: any) {
           task: mech.task
         }))
       },
-      // LOG INICIAL
       history: {
         create: {
           newStatus: "PENDING",
@@ -99,16 +99,41 @@ export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | 
 
     // 3. Financeiro e Estoque
     if (newStatus === "COMPLETED") {
-      const existingTx = await tx.financialTransaction.findFirst({
+      
+      // Inteligência Financeira: Limpamos os registros financeiros antigos desta OS para recriar com precisão
+      await tx.financialTransaction.deleteMany({
         where: { orderId: orderId, tenantId: session.user.tenantId }
       });
-      if (!existingTx) {
+
+      // 3A. Se houver Adiantamento, lança ele separado no caixa
+      if (order.advancePayment > 0) {
         await tx.financialTransaction.create({
           data: {
-            title: `OS #${order.number} - ${paymentMethod || "Pagamento"}`,
+            title: `OS #${order.number} - Adiantamento (Sinal)`,
             type: "INCOME",
             category: "Serviços Realizados",
-            amount: order.total,
+            amount: order.advancePayment,
+            status: "PAID",
+            paymentMethod: "PIX / Transferência", // Pode ser generalizado para o sinal
+            dueDate: order.createdAt,
+            paymentDate: order.createdAt,
+            orderId: order.id,
+            tenantId: session.user.tenantId,
+          }
+        });
+      }
+
+      // 3B. Calcula o Saldo Devedor (Total - Adiantamento)
+      const remainingBalance = order.total - order.advancePayment;
+      
+      // Se ainda sobrar algo a pagar, lança o Pagamento Final
+      if (remainingBalance > 0) {
+        await tx.financialTransaction.create({
+          data: {
+            title: `OS #${order.number} - Pagamento Final`,
+            type: "INCOME",
+            category: "Serviços Realizados",
+            amount: remainingBalance,
             status: "PAID",
             paymentMethod: paymentMethod || "Não informado",
             dueDate: new Date(),
@@ -119,6 +144,7 @@ export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | 
         });
       }
 
+      // 3C. Baixa de Estoque
       if (!wasAlreadyCompleted) {
         for (const item of order.items) {
           if (!item.isLabor && item.productId) {
@@ -140,6 +166,7 @@ export async function updateOrderStatus(orderId: string, newStatus: "PENDING" | 
       }
     } 
     else {
+      // Se for estornado, desfaz financeiro e estoque
       await tx.financialTransaction.deleteMany({
         where: { orderId: orderId, tenantId: session.user.tenantId }
       });
@@ -206,6 +233,7 @@ export async function updateOrderDetails(orderId: string, data: any) {
         laborTotal: data.laborTotal,
         partsTotal: data.partsTotal,
         discount: data.discount,
+        advancePayment: data.advancePayment || 0.0, // <-- Atualiza Adiantamento
         total: data.total,
         items: {
           create: data.items.map((item: any) => ({
@@ -227,10 +255,9 @@ export async function updateOrderDetails(orderId: string, data: any) {
       },
     });
     
-    // Opcional: Adicionar log avisando que a OS foi modificada (sem mudar status)
     await tx.orderHistory.create({
       data: {
-        newStatus: data.status || "PENDING", // Pega o status atual que veio ou default
+        newStatus: data.status || "PENDING",
         notes: "Detalhes da OS (Peças/Valores) atualizados manualmente.",
         orderId: orderId,
         tenantId: session.user.tenantId,

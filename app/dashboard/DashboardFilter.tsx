@@ -44,50 +44,58 @@ export function DashboardFilter() {
     
     setCustomFrom(fromStr);
     setCustomTo(toStr);
-    router.push(`?from=${fromStr}&to=${toStr}`);
+    
+    // Mantém outros parâmetros da URL se existirem (ex: osOrder)
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('from', fromStr);
+    params.set('to', toStr);
+    router.push(`?${params.toString()}`);
   };
 
   const handleCustomFilter = () => {
     if (customFrom && customTo) {
-      router.push(`?from=${customFrom}&to=${customTo}`);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('from', customFrom);
+      params.set('to', customTo);
+      router.push(`?${params.toString()}`);
     }
   };
 
   return (
-    <div className="flex flex-col lg:flex-row items-center justify-between bg-white border border-zinc-200 rounded-lg p-2 shadow-sm mb-6 gap-3">
+    <div className="flex flex-col lg:flex-row items-center justify-between bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2 shadow-sm mb-6 gap-3">
       {/* Botões Rápidos */}
       <div className="flex flex-wrap items-center gap-1 w-full lg:w-auto">
-        <Button variant="ghost" size="sm" onClick={() => setDateRange(0)} className="text-zinc-600 hover:text-zinc-900">
+        <Button variant="ghost" size="sm" onClick={() => setDateRange(0)} className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 dark:hover:bg-zinc-800">
           Hoje
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => setDateRange(7)} className="text-zinc-600 hover:text-zinc-900">
+        <Button variant="ghost" size="sm" onClick={() => setDateRange(7)} className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 dark:hover:bg-zinc-800">
           Últimos 7 Dias
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => setDateRange(0, true)} className="text-zinc-600 hover:text-zinc-900">
+        <Button variant="ghost" size="sm" onClick={() => setDateRange(0, true)} className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 dark:hover:bg-zinc-800">
           Este Mês
         </Button>
-        <Button variant="ghost" size="sm" onClick={() => setDateRange(0, false, true)} className="text-zinc-600 hover:text-zinc-900">
+        <Button variant="ghost" size="sm" onClick={() => setDateRange(0, false, true)} className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 dark:hover:bg-zinc-800">
           Este Ano
         </Button>
       </div>
 
       {/* Calendário Customizado */}
-      <div className="flex items-center gap-2 w-full lg:w-auto border-t lg:border-t-0 lg:border-l border-zinc-200 pt-3 lg:pt-0 lg:pl-3">
+      <div className="flex items-center gap-2 w-full lg:w-auto border-t lg:border-t-0 lg:border-l border-zinc-200 dark:border-zinc-800 pt-3 lg:pt-0 lg:pl-3">
         <CalendarIcon className="w-4 h-4 text-zinc-400 hidden sm:block" />
         <Input 
           type="date" 
           value={customFrom} 
           onChange={(e) => setCustomFrom(e.target.value)} 
-          className="h-8 text-xs bg-zinc-50"
+          className="h-8 text-xs bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-800 [color-scheme:light] dark:[color-scheme:dark]"
         />
-        <span className="text-zinc-400 text-xs">até</span>
+        <span className="text-zinc-400 dark:text-zinc-500 text-xs">até</span>
         <Input 
           type="date" 
           value={customTo} 
           onChange={(e) => setCustomTo(e.target.value)} 
-          className="h-8 text-xs bg-zinc-50"
+          className="h-8 text-xs bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-800 [color-scheme:light] dark:[color-scheme:dark]"
         />
-        <Button size="sm" onClick={handleCustomFilter} className="h-8 bg-zinc-900 hover:bg-zinc-800 text-white">
+        <Button size="sm" onClick={handleCustomFilter} className="h-8 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-zinc-200 dark:text-zinc-900">
           <Filter className="w-3 h-3 mr-1" /> Filtrar
         </Button>
       </div>

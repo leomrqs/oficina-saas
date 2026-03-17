@@ -205,6 +205,7 @@ model Order {
   laborTotal    Float       @default(0.0) 
   partsTotal    Float       @default(0.0) 
   discount      Float       @default(0.0) 
+  advancePayment Float      @default(0.0)
   total         Float       @default(0.0) 
   
   // DADOS DA VISTORIA

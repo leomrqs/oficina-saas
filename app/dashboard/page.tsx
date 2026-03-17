@@ -2,14 +2,15 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { DollarSign, FileText, Wrench, AlertTriangle, Building, ArrowUpRight, ArrowDownRight, ShoppingCart, CheckCircle2 } from "lucide-react";
+import { DollarSign, FileText, Wrench, AlertTriangle, Building, ArrowUpRight, ArrowDownRight, ShoppingCart, CheckCircle2, User, CalendarClock, ArrowDown, ArrowUp, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { FinancialChart, OSStatusChart } from "./DashboardCharts";
 import { Button } from "@/components/ui/button";
 import { DashboardFilter } from "./DashboardFilter"; 
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ from?: string, to?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ from?: string, to?: string, osOrder?: string }> }) {
   const session = await getServerSession(authOptions);
   const isSuperAdmin = session?.user?.role === "SUPER_ADMIN";
   const tenantId = session?.user?.tenantId;
@@ -26,30 +27,21 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     );
   }
 
-  // -----------------------------------------------------------------
-  // RESOLVENDO A PROMISE DO NEXT.JS 15 PARA LER A URL
-  // -----------------------------------------------------------------
   const params = await searchParams;
 
-  // -----------------------------------------------------------------
-  // LÓGICA DE DATAS (MÁQUINA DO TEMPO)
-  // -----------------------------------------------------------------
   const now = new Date();
-  let startDate = new Date(now.getFullYear(), now.getMonth(), 1); // Padrão: Este Mês
+  let startDate = new Date(now.getFullYear(), now.getMonth(), 1); 
   let endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-  // Se o utilizador usou o filtro na URL, substituímos as datas
   if (params?.from && params?.to) {
     startDate = new Date(`${params.from}T00:00:00`);
     endDate = new Date(`${params.to}T23:59:59`);
   }
 
-  // Calcula o período anterior exato para fazer a % de crescimento
   const diffTime = endDate.getTime() - startDate.getTime();
   const prevStartDate = new Date(startDate.getTime() - diffTime - 1);
   const prevEndDate = new Date(startDate.getTime() - 1);
 
-  // 1. Receita do Período Selecionado vs Período Anterior
   const currentPeriodIncome = await prisma.financialTransaction.aggregate({
     where: { tenantId, type: "INCOME", status: "PAID", paymentDate: { gte: startDate, lte: endDate } },
     _sum: { amount: true }
@@ -67,35 +59,29 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   if (revLast > 0) revPercent = ((revCurrent - revLast) / revLast) * 100;
   else if (revCurrent > 0) revPercent = 100;
 
-  // 2. Orçamentos Abertos (Criados no Período e ainda Pendentes)
   const pendingOrdersCount = await prisma.order.count({
     where: { tenantId, status: "PENDING", createdAt: { gte: startDate, lte: endDate } }
   });
 
-  // 3. Serviços Movimentados no Período (Aprovados ou Finalizados)
   const servicesInPeriodCount = await prisma.order.count({
     where: { tenantId, updatedAt: { gte: startDate, lte: endDate }, status: { in: ["APPROVED", "COMPLETED"] } }
   });
 
-  // 4. Estoque Crítico (O stock é TEMPO REAL, o filtro de data não afeta isso)
   const allProducts = await prisma.product.findMany({
     where: { tenantId }, select: { id: true, name: true, sku: true, stock: true, minStock: true }
   });
   const criticalProductsAll = allProducts.filter(p => p.stock <= p.minStock).sort((a, b) => a.stock - b.stock);
   const topCriticalProducts = criticalProductsAll.slice(0, 6);
 
-  // 5. Gráfico Financeiro Inteligente (Dinâmico conforme a data)
   const transactions = await prisma.financialTransaction.findMany({
     where: { tenantId, paymentDate: { gte: startDate, lte: endDate }, status: "PAID" },
     select: { amount: true, type: true, paymentDate: true }
   });
 
-  // Decide se agrupa por DIA ou por MÊS baseado no tamanho do filtro
   const diffDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
   const groupBy = diffDays <= 35 ? 'day' : 'month';
   const dataMap = new Map();
 
-  // Pré-preenche o gráfico para não ter "buracos"
   if (groupBy === 'day') {
     for(let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
        const key = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
@@ -127,7 +113,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   });
   const financialChartData = Array.from(dataMap.values());
 
-  // 6. Gráfico de Status das OS no Período
   const osStatusCount = await prisma.order.groupBy({
     by: ['status'],
     where: { tenantId, createdAt: { gte: startDate, lte: endDate } },
@@ -141,10 +126,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     { name: "Canceladas", value: osStatusCount.find(x => x.status === "CANCELED")?._count || 0, fill: "#ef4444" },
   ];
 
-  // 7. Últimas 6 Ordens de Serviço do Período
+  // Identifica a ordenação das OS pelo parametro na URL
+  const osOrderDirection = params?.osOrder === 'asc' ? 'asc' : 'desc';
+
   const recentOrders = await prisma.order.findMany({
     where: { tenantId, updatedAt: { gte: startDate, lte: endDate } },
-    orderBy: { updatedAt: 'desc' },
+    orderBy: { updatedAt: osOrderDirection },
     take: 6,
     include: { customer: { select: { name: true } }, vehicle: { select: { plate: true, brand: true, model: true } } }
   });
@@ -152,13 +139,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
   const getStatusBadge = (status: string) => {
     switch(status) {
-      case "PENDING": return <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50">Orçamento</Badge>;
-      case "APPROVED": return <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50">Em Serviço</Badge>;
-      case "COMPLETED": return <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50">Finalizado</Badge>;
-      case "CANCELED": return <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50">Cancelado</Badge>;
+      case "PENDING": return <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50 dark:bg-yellow-500/10 dark:border-yellow-500/20 dark:text-yellow-500">Orçamento</Badge>;
+      case "APPROVED": return <Badge variant="outline" className="text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-400">Em Serviço</Badge>;
+      case "COMPLETED": return <Badge variant="outline" className="text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400">Finalizado</Badge>;
+      case "CANCELED": return <Badge variant="outline" className="text-red-600 border-red-200 bg-red-50 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400">Cancelado</Badge>;
       default: return <Badge>{status}</Badge>;
     }
   };
+
+  // Prepara a query string para não perder os filtros de data ao clicar na ordenação
+  const currentQuery = new URLSearchParams();
+  if (params?.from) currentQuery.set("from", params.from);
+  if (params?.to) currentQuery.set("to", params.to);
+  const toggleOrder = osOrderDirection === 'desc' ? 'asc' : 'desc';
+  currentQuery.set("osOrder", toggleOrder);
 
   return (
     <>
@@ -171,7 +165,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       <DashboardFilter />
 
-      {/* CARDS DE RESUMO */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="transition-all duration-300 hover:shadow-md border-l-4 border-l-emerald-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -209,22 +202,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </CardContent>
         </Card>
 
-        {/* Estoque atual */}
-        <Card className={`transition-all duration-300 hover:shadow-md border-l-4 ${criticalProductsAll.length > 0 ? 'border-l-red-500 bg-red-50/30' : 'border-l-zinc-300'}`}>
+        <Card className={`transition-all duration-300 hover:shadow-md border-l-4 ${criticalProductsAll.length > 0 ? 'border-l-red-500 bg-red-50/30 dark:bg-red-950/20' : 'border-l-zinc-300'}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className={`text-sm font-medium ${criticalProductsAll.length > 0 ? 'text-red-600' : 'text-zinc-600'}`}>Estoque Crítico Atual</CardTitle>
-            <AlertTriangle className={`h-4 w-4 ${criticalProductsAll.length > 0 ? 'text-red-600' : 'text-zinc-500'}`} />
+            <CardTitle className={`text-sm font-medium ${criticalProductsAll.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-600 dark:text-zinc-400'}`}>Estoque Crítico Atual</CardTitle>
+            <AlertTriangle className={`h-4 w-4 ${criticalProductsAll.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-500 dark:text-zinc-400'}`} />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${criticalProductsAll.length > 0 ? 'text-red-600' : 'text-zinc-900'}`}>{criticalProductsAll.length} itens</div>
-            <p className={`text-xs mt-1 ${criticalProductsAll.length > 0 ? 'text-red-500 font-medium' : 'text-zinc-500'}`}>
+            <div className={`text-2xl font-bold ${criticalProductsAll.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-zinc-100'}`}>{criticalProductsAll.length} itens</div>
+            <p className={`text-xs mt-1 ${criticalProductsAll.length > 0 ? 'text-red-500 font-medium' : 'text-zinc-500 dark:text-zinc-400'}`}>
               {criticalProductsAll.length > 0 ? 'Reposição urgente!' : 'Estoque regular'}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* ÁREA DOS GRÁFICOS */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mt-4">
         <Card className="col-span-4 transition-all duration-300 hover:shadow-md">
           <CardHeader>
@@ -247,30 +238,56 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </Card>
       </div>
 
-      {/* PAINEL INFERIOR: ÚLTIMAS OS E WIDGET DE STOCK */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mt-4 mb-8">
-        <Card className="col-span-4 transition-all duration-300 hover:shadow-md">
-          <CardHeader>
-            <CardTitle>Movimentações do Período (OS)</CardTitle>
+        <Card className="col-span-4 transition-all duration-300 hover:shadow-md flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between border-b dark:border-zinc-800 pb-4">
+            <div>
+              <CardTitle>Movimentações do Período (OS)</CardTitle>
+              <CardDescription className="mt-1">Serviços alterados recentemente.</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link href={`?${currentQuery.toString()}`}>
+                <Button variant="outline" size="sm" className="h-8 text-xs px-2 dark:border-zinc-700">
+                  {osOrderDirection === 'desc' ? <ArrowDown className="w-3 h-3 mr-1 text-blue-500"/> : <ArrowUp className="w-3 h-3 mr-1 text-blue-500"/>}
+                  {osOrderDirection === 'desc' ? "Mais Recentes" : "Mais Antigas"}
+                </Button>
+              </Link>
+              <Link href="/dashboard/os">
+                <Button variant="ghost" size="sm" className="h-8 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/30 px-2">
+                  Ver Todas <ExternalLink className="w-3 h-3 ml-1"/>
+                </Button>
+              </Link>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-5">
+          <CardContent className="pt-4 flex-1">
+            <div className="space-y-4">
               {recentOrders.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-8 text-zinc-400">
                   <FileText className="w-8 h-8 mb-2 opacity-50" />
-                  <p className="text-sm font-medium">Nenhuma ordem no período.</p>
+                  <p className="text-sm font-medium">Nenhuma ordem neste período.</p>
                 </div>
               )}
               {recentOrders.map((os) => (
-                <div key={os.id} className="flex items-center justify-between group border-b border-zinc-100 pb-3 last:border-0 last:pb-0">
-                  <div className="space-y-1">
-                    <p className="text-sm font-bold leading-none text-zinc-900">
-                      {os.vehicle.brand} {os.vehicle.model} <span className="text-zinc-400 font-normal">({os.vehicle.plate})</span>
-                    </p>
-                    <p className="text-xs text-zinc-500">Cliente: {os.customer.name}</p>
+                <div key={os.id} className="flex flex-col sm:flex-row sm:items-center justify-between group border-b border-zinc-100 dark:border-zinc-800 pb-4 last:border-0 last:pb-0 gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-zinc-100 dark:bg-zinc-800/80 p-2 rounded-md shrink-0 flex flex-col items-center justify-center min-w-[56px] border dark:border-zinc-700/50">
+                      <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">OS</span>
+                      <span className="text-sm font-black text-zinc-900 dark:text-zinc-100">#{os.number}</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-bold leading-none text-zinc-900 dark:text-zinc-100">
+                        {os.vehicle.brand} {os.vehicle.model} <span className="text-zinc-400 dark:text-zinc-500 font-normal">({os.vehicle.plate})</span>
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                        <span className="flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800/50 px-1.5 py-0.5 rounded-sm"><User className="w-3 h-3"/> {os.customer.name}</span>
+                        <span className="flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800/50 px-1.5 py-0.5 rounded-sm"><CalendarClock className="w-3 h-3"/> {new Date(os.updatedAt).toLocaleDateString('pt-BR')}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex flex-col items-end gap-1.5">
-                    <div className="font-bold text-sm text-zinc-900">{formatBRL(os.total)}</div>
+                  <div className="flex items-center sm:flex-col sm:items-end justify-between gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                    <div className="font-bold text-sm text-zinc-900 dark:text-zinc-100 bg-zinc-50 dark:bg-zinc-800/50 px-2 py-1 rounded-md sm:bg-transparent sm:p-0">
+                      {formatBRL(os.total)}
+                    </div>
                     {getStatusBadge(os.status)}
                   </div>
                 </div>
@@ -279,35 +296,38 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </CardContent>
         </Card>
 
-        <Card className={`col-span-3 transition-all duration-300 hover:shadow-md ${topCriticalProducts.length > 0 ? 'border-red-100 bg-red-50/10' : ''}`}>
-          <CardHeader>
+        <Card className={`col-span-3 transition-all duration-300 hover:shadow-md flex flex-col ${topCriticalProducts.length > 0 ? 'border-red-100 bg-red-50/10 dark:border-red-900/30 dark:bg-red-950/10' : ''}`}>
+          <CardHeader className="border-b dark:border-zinc-800 pb-4">
             <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className={`w-5 h-5 ${topCriticalProducts.length > 0 ? 'text-red-500' : 'text-zinc-400'}`} />
+              <AlertTriangle className={`w-5 h-5 ${topCriticalProducts.length > 0 ? 'text-red-500 dark:text-red-400' : 'text-zinc-400'}`} />
               Painel de Compras (Falta de Estoque)
             </CardTitle>
+            <CardDescription className="mt-1">Top 6 itens que precisam de reposição.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4 flex-1">
             <div className="space-y-4">
               {topCriticalProducts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-emerald-500">
+                <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-emerald-500">
                   <CheckCircle2 className="w-10 h-10 mb-3 opacity-80" />
                   <p className="text-sm font-bold">O estoque está saudável!</p>
                 </div>
               ) : (
                 topCriticalProducts.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between group border-b border-zinc-200 pb-3 last:border-0 last:pb-0">
+                  <div key={p.id} className="flex items-center justify-between group border-b border-zinc-100 dark:border-zinc-800 pb-3 last:border-0 last:pb-0">
                     <div>
-                      <p className="text-sm font-bold text-zinc-900 truncate max-w-[160px]" title={p.name}>{p.name}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">Ref: {p.sku || 'S/N'}</p>
+                      <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate max-w-[160px] md:max-w-[200px]" title={p.name}>{p.name}</p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Ref: {p.sku || 'S/N'}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-wider mb-1">Mín: {p.minStock}</p>
-                        <Badge variant="destructive" className="font-bold text-xs bg-red-600 hover:bg-red-700">{p.stock} unid.</Badge>
+                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider mb-1">Mín: {p.minStock}</p>
+                        <Badge variant="destructive" className="font-bold text-xs bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600">{p.stock} unid.</Badge>
                       </div>
-                      <Button variant="outline" size="icon" className="h-8 w-8 text-zinc-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50">
-                        <ShoppingCart className="w-4 h-4" />
-                      </Button>
+                      <Link href="/dashboard/estoque">
+                        <Button variant="outline" size="icon" className="h-8 w-8 text-zinc-400 dark:border-zinc-700 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 dark:hover:bg-blue-950/50 dark:hover:text-blue-400">
+                          <ShoppingCart className="w-4 h-4" />
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 ))

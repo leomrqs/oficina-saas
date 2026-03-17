@@ -43,6 +43,7 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
   const [customerNotes, setCustomerNotes] = useState("");
   const [warrantyText, setWarrantyText] = useState("");
   const [discount, setDiscount] = useState(0);
+  const [advancePayment, setAdvancePayment] = useState(0); // <-- NOVO ESTADO
   const [items, setItems] = useState<any[]>([]);
   const [mechanics, setMechanics] = useState<any[]>([]);
 
@@ -75,9 +76,11 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
   };
 
   const onDragEnd = async (result: any) => {
-    const { destination, source, draggableId } = result;
+    const { destination, source, draggableId, type } = result;
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+    
+    if (type === "COLUMN") return;
 
     const newStatus = destination.droppableId;
     const updatedOrders = orders.map(o => o.id === draggableId ? { ...o, status: newStatus, updatedAt: new Date() } : o);
@@ -117,6 +120,7 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
     setCustomerNotes(os.customerNotes || "");
     setWarrantyText(os.warrantyText || "");
     setDiscount(os.discount || 0);
+    setAdvancePayment(os.advancePayment || 0); // <-- Adicionado Adiantamento
     setItems(os.items.map((i: any) => ({ ...i })));
     setMechanics(os.mechanics.map((m: any) => ({ id: m.id, employeeId: m.employeeId, task: m.task })));
     setIsEditing(false); 
@@ -127,7 +131,7 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
     try {
       const data = {
         customerId: selectedCustomer, vehicleId: selectedVehicle, mileage, fuelLevel,
-        deliveryDate, problem, customerNotes, warrantyText, laborTotal, partsTotal, discount, total: grandTotal, items, mechanics, status: selectedOS.status
+        deliveryDate, problem, customerNotes, warrantyText, laborTotal, partsTotal, discount, advancePayment, total: grandTotal, items, mechanics, status: selectedOS.status
       };
       await updateOrderDetails(selectedOS.id, data);
       
@@ -237,80 +241,97 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex h-full gap-3 xl:gap-4 items-start overflow-x-auto xl:overflow-x-hidden pb-6">
-          {COLUMNS.map(column => {
-            const columnOrders = filteredOrders.filter(o => o.status === column.id);
-            const Icon = column.icon;
+        <Droppable droppableId="board" type="COLUMN" direction="horizontal">
+          {(providedBoard) => (
+            <div 
+              ref={providedBoard.innerRef}
+              {...providedBoard.droppableProps}
+              className="flex h-full gap-3 xl:gap-4 items-start overflow-x-auto xl:overflow-x-hidden pb-6"
+            >
+              {COLUMNS.map((column, index) => {
+                const columnOrders = filteredOrders.filter(o => o.status === column.id);
+                const Icon = column.icon;
 
-            return (
-              <div key={column.id} className="flex flex-col flex-1 w-full min-w-[280px] xl:min-w-0 shrink-0 bg-zinc-50 dark:bg-zinc-900/50 border dark:border-zinc-800/80 rounded-xl h-full max-h-[calc(100vh-210px)]">
-                <div className={`p-3 border-b rounded-t-xl flex items-center justify-between ${column.color}`}>
-                  <h3 className="font-bold flex items-center gap-2 text-sm">
-                    <Icon className="w-4 h-4" /> {column.title}
-                  </h3>
-                  <Badge variant="secondary" className="bg-white/50 dark:bg-black/20">{columnOrders.length}</Badge>
-                </div>
+                return (
+                  <Draggable key={column.id} draggableId={column.id} index={index} isDragDisabled={true}>
+                    {(providedCol) => (
+                      <div 
+                        ref={providedCol.innerRef}
+                        {...providedCol.draggableProps}
+                        className="flex flex-col flex-1 w-full min-w-[280px] xl:min-w-0 shrink-0 bg-zinc-50 dark:bg-zinc-900/50 border dark:border-zinc-800/80 rounded-xl h-full max-h-[calc(100vh-210px)]"
+                      >
+                        <div className={`p-3 border-b rounded-t-xl flex items-center justify-between ${column.color}`}>
+                          <h3 className="font-bold flex items-center gap-2 text-sm">
+                            <Icon className="w-4 h-4" /> {column.title}
+                          </h3>
+                          <Badge variant="secondary" className="bg-white/50 dark:bg-black/20">{columnOrders.length}</Badge>
+                        </div>
 
-                <Droppable droppableId={column.id}>
-                  {(provided, snapshot) => (
-                    <div 
-                      {...provided.droppableProps} 
-                      ref={provided.innerRef}
-                      className={`flex-1 p-3 overflow-y-auto space-y-3 transition-colors ${snapshot.isDraggingOver ? 'bg-zinc-100 dark:bg-zinc-800/50' : ''}`}
-                    >
-                      {columnOrders.map((order, index) => (
-                        <Draggable key={order.id} draggableId={order.id} index={index}>
+                        <Droppable droppableId={column.id} type="CARD">
                           {(provided, snapshot) => (
-                            <div
+                            <div 
+                              {...provided.droppableProps} 
                               ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              onClick={() => openOSDetails(order)}
-                              className={`relative bg-white dark:bg-zinc-950 p-4 rounded-lg border dark:border-zinc-800 shadow-sm group cursor-pointer ${snapshot.isDragging ? 'shadow-xl ring-2 ring-blue-500 scale-105 rotate-2' : 'hover:shadow-md hover:border-blue-300 dark:hover:border-blue-900 transition-all'}`}
+                              className={`flex-1 p-3 overflow-y-auto space-y-3 transition-colors ${snapshot.isDraggingOver ? 'bg-zinc-100 dark:bg-zinc-800/50' : ''}`}
                             >
-                              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-zinc-900 rounded-md shadow-sm border dark:border-zinc-800 p-0.5 z-10">
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-blue-500" onClick={(e) => { e.stopPropagation(); openOSDetails(order); }}><Edit3 className="w-3.5 h-3.5"/></Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-green-500" onClick={(e) => { e.stopPropagation(); handleWhatsApp(e, order); }}><MessageCircle className="w-3.5 h-3.5"/></Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-zinc-900 dark:hover:text-white" onClick={(e) => { e.stopPropagation(); triggerPDFPrint(e, order); }}><Printer className="w-3.5 h-3.5"/></Button>
-                              </div>
+                              {columnOrders.map((order, index) => (
+                                <Draggable key={order.id} draggableId={order.id} index={index}>
+                                  {(provided, snapshot) => (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      {...provided.dragHandleProps}
+                                      onClick={() => openOSDetails(order)}
+                                      className={`relative bg-white dark:bg-zinc-950 p-4 rounded-lg border dark:border-zinc-800 shadow-sm group cursor-pointer ${snapshot.isDragging ? 'shadow-xl ring-2 ring-blue-500 scale-105 rotate-2' : 'hover:shadow-md hover:border-blue-300 dark:hover:border-blue-900 transition-all'}`}
+                                    >
+                                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-zinc-900 rounded-md shadow-sm border dark:border-zinc-800 p-0.5 z-10">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-blue-500" onClick={(e) => { e.stopPropagation(); openOSDetails(order); }}><Edit3 className="w-3.5 h-3.5"/></Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-green-500" onClick={(e) => { e.stopPropagation(); handleWhatsApp(e, order); }}><MessageCircle className="w-3.5 h-3.5"/></Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-zinc-500 hover:text-zinc-900 dark:hover:text-white" onClick={(e) => { e.stopPropagation(); triggerPDFPrint(e, order); }}><Printer className="w-3.5 h-3.5"/></Button>
+                                      </div>
 
-                              <div className="flex justify-between items-start mb-2">
-                                <Badge variant="outline" className="font-mono text-xs bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700">{order.vehicle.plate}</Badge>
-                                <span className="text-[10px] flex items-center gap-1 font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 px-1.5 py-0.5 rounded-sm group-hover:opacity-0 transition-opacity">
-                                  <Clock className="w-3 h-3"/> {getTimeInStatus(order.updatedAt)}
-                                </span>
-                              </div>
-                              
-                              <p className="font-bold text-sm text-zinc-900 dark:text-zinc-100 mt-2">{order.vehicle.brand} {order.vehicle.model}</p>
-                              <p className="text-xs text-zinc-500 truncate mb-3 flex items-center gap-1 mt-1">
-                                <User className="w-3 h-3"/> {order.customer.name}
-                              </p>
+                                      <div className="flex justify-between items-start mb-2">
+                                        <Badge variant="outline" className="font-mono text-xs bg-zinc-100 dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700">{order.vehicle.plate}</Badge>
+                                        <span className="text-[10px] flex items-center gap-1 font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-900 px-1.5 py-0.5 rounded-sm group-hover:opacity-0 transition-opacity">
+                                          <Clock className="w-3 h-3"/> {getTimeInStatus(order.updatedAt)}
+                                        </span>
+                                      </div>
+                                      
+                                      <p className="font-bold text-sm text-zinc-900 dark:text-zinc-100 mt-2">{order.vehicle.brand} {order.vehicle.model}</p>
+                                      <p className="text-xs text-zinc-500 truncate mb-3 flex items-center gap-1 mt-1">
+                                        <User className="w-3 h-3"/> {order.customer.name}
+                                      </p>
 
-                              {order.mechanics.length > 0 && (
-                                <div className="flex items-center gap-1.5 mb-3 bg-zinc-50 dark:bg-zinc-900 p-1.5 rounded-md border dark:border-zinc-800">
-                                  <HardHat className="w-3.5 h-3.5 text-blue-500" />
-                                  <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate">
-                                    {order.mechanics[0].employee?.name || 'Desconhecido'}
-                                  </span>
-                                </div>
-                              )}
+                                      {order.mechanics.length > 0 && (
+                                        <div className="flex items-center gap-1.5 mb-3 bg-zinc-50 dark:bg-zinc-900 p-1.5 rounded-md border dark:border-zinc-800">
+                                          <HardHat className="w-3.5 h-3.5 text-blue-500" />
+                                          <span className="text-xs font-bold text-zinc-700 dark:text-zinc-300 truncate">
+                                            {order.mechanics[0].employee?.name || 'Desconhecido'}
+                                          </span>
+                                        </div>
+                                      )}
 
-                              <div className="flex justify-between items-end border-t dark:border-zinc-800 pt-3 mt-3">
-                                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">OS #{order.number}</p>
-                                <p className="font-black text-sm text-emerald-600 dark:text-emerald-400">{formatBRL(order.total)}</p>
-                              </div>
+                                      <div className="flex justify-between items-end border-t dark:border-zinc-800 pt-3 mt-3">
+                                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">OS #{order.number}</p>
+                                        <p className="font-black text-sm text-emerald-600 dark:text-emerald-400">{formatBRL(order.total)}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                </Draggable>
+                              ))}
+                              {provided.placeholder}
                             </div>
                           )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </div>
-            );
-          })}
-        </div>
+                        </Droppable>
+                      </div>
+                    )}
+                  </Draggable>
+                );
+              })}
+              {providedBoard.placeholder}
+            </div>
+          )}
+        </Droppable>
       </DragDropContext>
 
       <Dialog open={openViewOS} onOpenChange={(open) => {
@@ -319,8 +340,6 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
         <DialogContent className="sm:max-w-[1200px] !max-w-[1200px] w-[95vw] max-h-[95vh] flex flex-col p-0 overflow-hidden bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-xl">
           
           <div className="px-6 py-4 md:px-8 md:py-5 border-b dark:border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-zinc-900 shrink-0 z-10 shadow-sm">
-            
-            {/* NOVO: Flexbox que divide o título e o Botão X no Mobile */}
             <div className="flex justify-between items-start w-full sm:w-auto">
               <div>
                 <DialogTitle className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
@@ -366,7 +385,6 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
                 </p>
               </div>
 
-              {/* Botão de Fechar Exclusivo para Mobile */}
               <Button variant="ghost" size="icon" className="sm:hidden text-zinc-500 -mr-2 -mt-2 hover:bg-zinc-100 dark:hover:bg-zinc-800" onClick={() => { setOpenViewOS(false); setIsEditing(false); }}>
                 <X className="w-6 h-6" />
               </Button>
@@ -586,17 +604,32 @@ export function KanbanBoard({ initialOrders, customers, products, tenant, employ
           </div>
 
           <div className="px-4 py-4 md:px-8 md:py-5 bg-zinc-900 dark:bg-zinc-950 border-t dark:border-zinc-800 shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center z-20 gap-4 overflow-x-auto">
-            <div className="flex items-center gap-4 md:gap-8 text-sm text-zinc-400 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-4 md:gap-8 text-sm text-zinc-400 w-full sm:w-auto">
               <div><p className="text-[10px] font-bold uppercase mb-1">Peças</p><p className="text-lg md:text-xl text-white font-bold">{formatBRL(partsTotal)}</p></div>
               <div className="border-l border-zinc-700 pl-4 md:pl-8"><p className="text-[10px] font-bold uppercase mb-1">Serviços</p><p className="text-lg md:text-xl text-white font-bold">{formatBRL(laborTotal)}</p></div>
+              
               <div className="border-l border-zinc-700 pl-4 md:pl-8">
                 <p className="text-[10px] font-bold uppercase mb-1 text-emerald-400">Desconto (R$)</p>
-                <Input type="number" value={discount} onChange={e => setDiscount(parseFloat(e.target.value) || 0)} className={`w-24 md:w-28 h-8 ${!isEditing ? 'bg-transparent' : 'bg-white/10'} border-0 text-white font-bold text-base md:text-lg px-2`} readOnly={!isEditing} />
+                <Input type="number" value={discount} onChange={e => setDiscount(parseFloat(e.target.value) || 0)} className={`w-24 h-8 ${!isEditing ? 'bg-transparent' : 'bg-white/10'} border-0 text-white font-bold text-base px-2`} readOnly={!isEditing} />
               </div>
+
+              {/* NOVO: CAMPO DE ADIANTAMENTO / SINAL */}
+              <div className="border-l border-zinc-700 pl-4 md:pl-8 relative">
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="text-[10px] font-bold uppercase text-yellow-400">Sinal / Adiant.</p>
+                  {isEditing && (
+                    <button type="button" onClick={() => setAdvancePayment((partsTotal + laborTotal - discount) / 2)} className="text-[9px] bg-yellow-500/20 text-yellow-300 px-1.5 py-0.5 rounded hover:bg-yellow-500/40 transition-colors">
+                      50%
+                    </button>
+                  )}
+                </div>
+                <Input type="number" value={advancePayment} onChange={e => setAdvancePayment(parseFloat(e.target.value) || 0)} className={`w-28 h-8 ${!isEditing ? 'bg-transparent' : 'bg-white/10'} border-0 text-white font-bold text-base px-2`} readOnly={!isEditing} />
+              </div>
+
             </div>
             <div className="text-left sm:text-right w-full sm:w-auto border-t border-zinc-700 sm:border-0 pt-3 sm:pt-0">
-              <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-1">Total a Pagar</p>
-              <p className="text-3xl md:text-4xl font-black text-emerald-400">{formatBRL(grandTotal)}</p>
+              <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-1">Falta Pagar</p>
+              <p className="text-3xl md:text-4xl font-black text-emerald-400">{formatBRL(Math.max(0, grandTotal - advancePayment))}</p>
             </div>
           </div>
         </DialogContent>
