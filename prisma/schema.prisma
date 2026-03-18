@@ -137,6 +137,7 @@ model Vehicle {
   plate      String   @unique
   brand      String   
   model      String   
+  version    String?
   year       Int?
   
   customerId String

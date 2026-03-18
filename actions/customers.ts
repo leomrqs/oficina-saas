@@ -77,6 +77,7 @@ export async function createVehicle(formData: FormData) {
       plate: (formData.get("plate") as string).toUpperCase(),
       brand: formData.get("brand") as string,
       model: formData.get("model") as string,
+      version: formData.get("version") as string, // NOVO
       year: yearStr ? parseInt(yearStr) : null,
       customerId: formData.get("customerId") as string,
       tenantId: session.user.tenantId,
