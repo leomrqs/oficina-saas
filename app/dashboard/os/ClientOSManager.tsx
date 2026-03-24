@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
-import { Search, Plus, Trash2, FileText, Printer, MessageCircle, Settings, Car, Gauge, ShieldCheck, AlignLeft, HardHat, Wrench, Eye, Edit3, X, Save, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Filter, ArrowUp, ArrowDown, CalendarClock, CreditCard, Smartphone, Banknote } from "lucide-react";
+import { Search, Plus, Trash2, FileText, Printer, MessageCircle, Settings, Car, Gauge, ShieldCheck, AlignLeft, HardHat, Wrench, Eye, Edit3, X, Save, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Filter, ArrowUp, ArrowDown, CalendarClock, CreditCard, Smartphone, Banknote, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,6 +47,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
   // Estados para Finalização e Pagamento
   const [completingOS, setCompletingOS] = useState<any | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("PIX");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
@@ -183,6 +184,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     }
 
     try {
+      setIsSubmitting(true);
       const data = {
         customerId: selectedCustomer, vehicleId: selectedVehicle, mileage, fuelLevel,
         deliveryDate, problem, notes, customerNotes, warrantyText,
@@ -193,6 +195,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
       setOpenNewOS(false);
       resetForm();
     } catch { toast.error("Erro ao gerar OS."); }
+    finally { setIsSubmitting(false); }
   };
 
   const handleUpdateOS = async () => {
@@ -206,6 +209,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     }
 
     try {
+      setIsSubmitting(true);
       const data = {
         customerId: selectedCustomer, vehicleId: selectedVehicle, mileage, fuelLevel,
         deliveryDate, problem, notes, customerNotes, warrantyText,
@@ -217,6 +221,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
       setOpenViewOS(false);
       resetForm();
     } catch { toast.error("Erro ao atualizar a OS no banco."); }
+    finally { setIsSubmitting(false); }
   };
 
   const triggerPDFPrint = useCallback((e: any, os: any) => {
@@ -251,11 +256,13 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
 
   const confirmCompleteOS = async () => {
     try {
-      await updateOrderStatus(completingOS.id, "COMPLETED", paymentMethod); 
+      setIsSubmitting(true);
+      await updateOrderStatus(completingOS.id, "COMPLETED", paymentMethod);
       toast.success("OS Finalizada e Lançada no Caixa!");
       setCompletingOS(null);
       setOpenViewOS(false);
     } catch { toast.error("Erro ao finalizar OS."); }
+    finally { setIsSubmitting(false); }
   };
 
   const handleStatusChange = useCallback(async (e: any, os: any, newStatus: string) => {
@@ -443,6 +450,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
 
   const memoizedTable = useMemo(() => (
     <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-lg shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
       <Table>
         <TableHeader className="bg-zinc-50 dark:bg-zinc-950/50">
           <TableRow className="dark:border-zinc-800">
@@ -520,7 +528,8 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
           )})}
         </TableBody>
       </Table>
-      
+      </div>
+
       {/* CONTROLES DE PAGINAÇÃO */}
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between px-6 py-4 border-t dark:border-zinc-800 gap-4 bg-zinc-50/50 dark:bg-zinc-950/50">
@@ -702,7 +711,9 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
               {openNewOS && (
                 <>
                   <Button variant="outline" onClick={() => setOpenNewOS(false)} className="dark:border-zinc-700">Cancelar</Button>
-                  <Button onClick={handleSaveOS} className="bg-blue-600 hover:bg-blue-700 text-white">Salvar e Gerar OS</Button>
+                  <Button onClick={handleSaveOS} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">
+                    {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Salvando...</> : "Salvar e Gerar OS"}
+                  </Button>
                 </>
               )}
 
@@ -730,7 +741,9 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
               {openViewOS && isEditing && (
                 <>
                   <Button variant="outline" onClick={() => setIsEditing(false)} className="text-red-500 dark:border-zinc-700"><X className="w-4 h-4 mr-2"/> Cancelar Edição</Button>
-                  <Button onClick={handleUpdateOS} className="bg-blue-600 hover:bg-blue-700 text-white"><Save className="w-4 h-4 mr-2"/> Salvar Alterações</Button>
+                  <Button onClick={handleUpdateOS} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">
+                    {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Salvando...</> : <><Save className="w-4 h-4 mr-2"/> Salvar Alterações</>}
+                  </Button>
                 </>
               )}
             </div>
@@ -962,8 +975,8 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
           </div>
           <DialogFooter className="p-4 border-t dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/50 flex flex-col sm:flex-row gap-2">
             <Button variant="outline" className="w-full sm:w-auto h-12" onClick={() => setCompletingOS(null)}>Cancelar</Button>
-            <Button onClick={confirmCompleteOS} className="w-full sm:w-auto h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base">
-              Confirmar Pagamento
+            <Button onClick={confirmCompleteOS} disabled={isSubmitting} className="w-full sm:w-auto h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base">
+              {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processando...</> : "Confirmar Pagamento"}
             </Button>
           </DialogFooter>
         </DialogContent>

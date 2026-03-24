@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { CalendarDays, Plus, Clock, Car, User, FileText, CheckCircle2, Trash2, ArrowRight, Phone, Calendar as CalendarIcon, Filter, MessageCircle, AlertTriangle } from "lucide-react";
+import { CalendarDays, Plus, Clock, Car, User, FileText, CheckCircle2, Trash2, ArrowRight, Phone, Calendar as CalendarIcon, Filter, MessageCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,6 +53,8 @@ export function ClientAppointmentManager({ appointments, customers }: { appointm
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
   const [openNewModal, setOpenNewModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingOS, setIsGeneratingOS] = useState<string | null>(null);
 
   // Form State
   const [formDate, setFormDate] = useState(formatLocal(new Date()));
@@ -131,11 +133,13 @@ export function ClientAppointmentManager({ appointments, customers }: { appointm
   const handleCreate = async () => {
     if (!selectedCustomer || !formDate || !formTime) return toast.error("Preencha cliente, data e hora inicial.");
     try {
+      setIsSubmitting(true);
       await createAppointment({ customerId: selectedCustomer, vehicleId: selectedVehicle, date: formDate, time: formTime, endTime: formEndTime, notes });
       toast.success("Agendamento criado!");
       setOpenNewModal(false);
       setSelectedCustomer(""); setSelectedVehicle(""); setNotes(""); setFormEndTime("");
     } catch { toast.error("Erro ao agendar."); }
+    finally { setIsSubmitting(false); }
   };
 
   const handleStatus = async (id: string, status: any) => {
@@ -146,9 +150,11 @@ export function ClientAppointmentManager({ appointments, customers }: { appointm
   const handleGenerateOS = async (id: string) => {
     if (!confirm("Deseja gerar uma OS de Orçamento para este agendamento? Ele será marcado como 'OS Gerada'.")) return;
     try {
+      setIsGeneratingOS(id);
       await generateOSFromAppointment(id);
       toast.success("OS Gerada com sucesso! Vá para a tela de Pátio ou Orçamentos para adicionar peças.");
     } catch { toast.error("Erro ao gerar OS. O agendamento tem veículo atrelado?"); }
+    finally { setIsGeneratingOS(null); }
   };
 
   // NOVO: Função do WhatsApp
@@ -298,8 +304,8 @@ export function ClientAppointmentManager({ appointments, customers }: { appointm
                             )}
                             
                             {(app.status === "SCHEDULED" || app.status === "CONFIRMED") && (
-                              <Button size="sm" onClick={() => handleGenerateOS(app.id)} className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200 shadow-sm">
-                                Gerar OS <ArrowRight className="w-4 h-4 ml-1"/>
+                              <Button size="sm" onClick={() => handleGenerateOS(app.id)} disabled={isGeneratingOS === app.id} className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200 shadow-sm">
+                                {isGeneratingOS === app.id ? <><Loader2 className="w-4 h-4 mr-1 animate-spin" /> Gerando...</> : <>Gerar OS <ArrowRight className="w-4 h-4 ml-1"/></>}
                               </Button>
                             )}
 
@@ -332,11 +338,11 @@ export function ClientAppointmentManager({ appointments, customers }: { appointm
 
       {/* MODAL DE NOVO AGENDAMENTO */}
       <Dialog open={openNewModal} onOpenChange={setOpenNewModal}>
-        <DialogContent className="sm:max-w-lg dark:bg-zinc-950 dark:border-zinc-800 p-0 overflow-hidden rounded-xl">
-          <div className="p-6 border-b dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+        <DialogContent className="sm:max-w-lg dark:bg-zinc-950 dark:border-zinc-800 p-0 overflow-hidden rounded-xl max-h-[90vh] flex flex-col">
+          <div className="p-6 border-b dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 shrink-0">
             <DialogTitle className="flex items-center gap-2 text-xl"><CalendarDays className="w-5 h-5 text-blue-500"/> Agendar Serviço</DialogTitle>
           </div>
-          <div className="space-y-5 p-6">
+          <div className="space-y-5 p-6 flex-1 overflow-y-auto">
 
             {/* NOVO: Alerta de Choque de Horário */}
             {conflictingAppointment && (
@@ -393,7 +399,9 @@ export function ClientAppointmentManager({ appointments, customers }: { appointm
           </div>
           <DialogFooter className="p-4 border-t dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/50">
             <Button variant="outline" onClick={() => setOpenNewModal(false)} className="h-11 dark:border-zinc-800 w-full sm:w-auto">Cancelar</Button>
-            <Button onClick={handleCreate} className="h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold text-base w-full sm:w-auto">Salvar Agendamento</Button>
+            <Button onClick={handleCreate} disabled={isSubmitting} className="h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold text-base w-full sm:w-auto">
+              {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Salvando...</> : "Salvar Agendamento"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
