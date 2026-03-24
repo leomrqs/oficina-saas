@@ -40,18 +40,27 @@ enum FinancialStatus {
   PAID
 }
 
+// NOVO: Status do Agendamento
+enum AppointmentStatus {
+  SCHEDULED   // Marcado
+  CONFIRMED   // Confirmado pelo cliente
+  COMPLETED   // Compareceu / OS Gerada
+  CANCELED    // Cancelado
+  NO_SHOW     // Faltou
+}
+
 model Tenant {
-  id            String   @id @default(cuid())
-  name          String
-  cnpj          String?  @unique
-  phone         String?  
-  address       String?  
-  logoUrl       String?  
-  monthlyGoal   Float    @default(50000.0)
+  id              String   @id @default(cuid())
+  name            String
+  cnpj            String?  @unique
+  phone           String?  
+  address         String?  
+  logoUrl         String?  
+  monthlyGoal     Float    @default(50000.0)
   billingCycleDay Int      @default(1) // NOVO: Dia de Fechamento do Caixa
   
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   users         User[]
   customers     Customer[]
@@ -64,6 +73,7 @@ model Tenant {
   fixedExpenses FixedExpense[]
   employees     Employee[] 
   orderHistory  OrderHistory[]
+  appointments  Appointment[] // NOVO: Relação com Agendamentos
 
   @@map("tenants")
 }
@@ -90,7 +100,7 @@ model Employee {
   name      String
   cpf       String?
   phone     String?
-  role      String? 
+  role      String?  
   salary    Float?   // NOVO: Salário Mensal
   payDay    Int?     // NOVO: Dia do Pagamento 
   isActive  Boolean  @default(true)
@@ -127,6 +137,7 @@ model Customer {
 
   vehicles     Vehicle[]
   orders       Order[]
+  appointments Appointment[] // NOVO: Relação com Agendamentos
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -149,7 +160,8 @@ model Vehicle {
   tenantId   String
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  orders     Order[]
+  orders       Order[]
+  appointments Appointment[] // NOVO: Relação com Agendamentos
 
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -238,6 +250,8 @@ model Order {
   inventoryLogs InventoryTransaction[] // CORREÇÃO: Faltava a relação inversa do log de estoque
   mechanics     OrderMechanic[]
   history       OrderHistory[]
+  
+  appointment   Appointment? // NOVO: Relação 1-para-1 (Uma OS pode vir de um agendamento)
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -337,4 +351,35 @@ model FixedExpense {
 
   @@index([tenantId]) // INDEX DE PERFORMANCE
   @@map("fixed_expenses")
+}
+
+// ==========================================
+// NOVO: MODELO DE AGENDAMENTO (PLANILHA)
+// ==========================================
+model Appointment {
+  id         String            @id @default(cuid())
+  date       DateTime          @db.Date 
+  time       String            // Ex: "09:00"
+  endTime    String?           // NOVO: Previsão de término (Ex: "11:30")
+  notes      String?           @db.Text 
+  status     AppointmentStatus @default(SCHEDULED)
+
+  customerId String
+  customer   Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  vehicleId  String?
+  vehicle    Vehicle?          @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  orderId    String?           @unique 
+  order      Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  tenantId   String
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([tenantId]) 
+  @@index([tenantId, date]) 
+  @@map("appointments")
 }

@@ -4,11 +4,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Users, Package, FileText, DollarSign, Settings, Building, HardHat, LayoutGrid, Loader2 } from "lucide-react";
+import { LayoutDashboard, Users, Package, FileText, DollarSign, Settings, Building, HardHat, LayoutGrid, Loader2, CalendarDays } from "lucide-react";
 
 // MENU DO DONO/GERENTE (Acesso Total)
 const managerItems = [
   { name: "Painel da Oficina", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Agendamentos", href: "/dashboard/agendamentos", icon: CalendarDays },
   { name: "Pátio (Kanban)", href: "/dashboard/patio", icon: LayoutGrid }, 
   { name: "Orçamentos & OS", href: "/dashboard/os", icon: FileText },
   { name: "Clientes & Veículos", href: "/dashboard/clientes", icon: Users },
@@ -21,6 +22,7 @@ const managerItems = [
 // MENU DO MECÂNICO (Acesso Restrito - Sem Dinheiro e Configurações)
 const mechanicItems = [
   { name: "Painel de Serviços", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Agendamentos", href: "/dashboard/agendamentos", icon: CalendarDays },
   { name: "Pátio (Kanban)", href: "/dashboard/patio", icon: LayoutGrid },
   { name: "Orçamentos & OS", href: "/dashboard/os", icon: FileText },
   { name: "Clientes & Veículos", href: "/dashboard/clientes", icon: Users },
