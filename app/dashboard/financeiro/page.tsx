@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { DollarSign, ArrowUpRight, ArrowDownRight, AlertCircle } from "lucide-react";
+import { DollarSign } from "lucide-react";
 import { ClientFinanceManager } from "./ClientFinanceManager";
 
 export default async function FinanceiroPage() {
@@ -13,36 +13,44 @@ export default async function FinanceiroPage() {
     redirect("/login");
   }
 
+  const tenantId = session.user.tenantId;
+
+  // 1. Busca dados da oficina (Meta Mensal e Dia de Fechamento do Caixa)
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { monthlyGoal: true, billingCycleDay: true }
+  });
+
+  // 2. Busca todas as transações com os dados da OS e Cliente pendurados (Para o WhatsApp)
   const transactions = await prisma.financialTransaction.findMany({
-    where: { tenantId: session.user.tenantId },
+    where: { tenantId },
+    include: {
+      order: {
+        include: {
+          customer: true,
+          vehicle: true
+        }
+      }
+    },
     orderBy: { dueDate: 'desc' }
   });
 
+  // 3. Busca Contas Fixas (Aluguel, Luz, etc)
   const fixedExpenses = await prisma.fixedExpense.findMany({
-    where: { tenantId: session.user.tenantId },
+    where: { tenantId },
     orderBy: { dueDay: 'asc' }
   });
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const currentBalance = transactions
-    .filter(t => t.status === "PAID")
-    .reduce((acc, t) => t.type === "INCOME" ? acc + t.amount : acc - t.amount, 0);
-
-  const pendingIncome = transactions
-    .filter(t => t.type === "INCOME" && t.status === "PENDING")
-    .reduce((acc, t) => acc + t.amount, 0);
-
-  const pendingExpense = transactions
-    .filter(t => t.type === "EXPENSE" && t.status === "PENDING")
-    .reduce((acc, t) => acc + t.amount, 0);
-
-  const latePayments = transactions
-    .filter(t => t.status === "PENDING" && new Date(t.dueDate).getTime() < today.getTime())
-    .reduce((acc, t) => acc + t.amount, 0);
-
-  const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  // 4. Busca os Funcionários que têm salário e dia de pagamento (Automação do RH)
+  const employees = await prisma.employee.findMany({
+    where: { 
+      tenantId, 
+      isActive: true, 
+      salary: { not: null }, 
+      payDay: { not: null } 
+    },
+    orderBy: { payDay: 'asc' }
+  });
 
   return (
     <>
@@ -51,49 +59,17 @@ export default async function FinanceiroPage() {
           <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2 dark:text-white">
             <DollarSign className="h-8 w-8 text-zinc-900 dark:text-zinc-100" /> Gestão Financeira
           </h2>
-          <p className="text-zinc-500 dark:text-zinc-400">Controle seu fluxo de caixa, contas fixas mensais e inadimplência.</p>
+          <p className="text-zinc-500 dark:text-zinc-400">DRE Automático, fluxo de caixa, folha de pagamento e inadimplência.</p>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4 mb-8">
-        <div className={`p-5 rounded-xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-md ${currentBalance >= 0 ? 'bg-gradient-to-br from-zinc-900 to-zinc-800 border-zinc-800' : 'bg-gradient-to-br from-red-900 to-red-800 border-red-800'}`}>
-          <div className="flex justify-between items-start mb-2">
-            <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider">Saldo Real (Caixa)</p>
-            <DollarSign className="w-5 h-5 text-zinc-500" />
-          </div>
-          <p className="text-3xl font-black text-white tracking-tight">{formatBRL(currentBalance)}</p>
-          <p className="text-xs text-zinc-400 mt-2">Valores já liquidados hoje</p>
-        </div>
-
-        <div className="bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 p-5 rounded-xl shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
-          <div className="flex justify-between items-start mb-2">
-            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-500 uppercase tracking-wider">A Receber</p>
-            <ArrowUpRight className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
-          </div>
-          <p className="text-3xl font-black text-emerald-700 dark:text-emerald-400 tracking-tight">{formatBRL(pendingIncome)}</p>
-          <p className="text-xs text-emerald-600/80 dark:text-emerald-500/80 mt-2">OS aprovadas e pendentes</p>
-        </div>
-
-        <div className="bg-orange-50/50 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/30 p-5 rounded-xl shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
-          <div className="flex justify-between items-start mb-2">
-            <p className="text-sm font-medium text-orange-800 dark:text-orange-500 uppercase tracking-wider">A Pagar (Previsão)</p>
-            <ArrowDownRight className="w-5 h-5 text-orange-600 dark:text-orange-500" />
-          </div>
-          <p className="text-3xl font-black text-orange-700 dark:text-orange-400 tracking-tight">{formatBRL(pendingExpense)}</p>
-          <p className="text-xs text-orange-600/80 dark:text-orange-500/80 mt-2">Contas e fornecedores</p>
-        </div>
-
-        <div className="bg-red-50/50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 p-5 rounded-xl shadow-sm transition-all hover:-translate-y-1 hover:shadow-md">
-          <div className="flex justify-between items-start mb-2">
-            <p className="text-sm font-medium text-red-800 dark:text-red-500 uppercase tracking-wider">Atrasos / Inadimplência</p>
-            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-500" />
-          </div>
-          <p className="text-3xl font-black text-red-600 dark:text-red-500 tracking-tight">{formatBRL(latePayments)}</p>
-          <p className="text-xs text-red-500/80 dark:text-red-500/80 mt-2 font-medium">Contas vencidas</p>
-        </div>
-      </div>
-
-      <ClientFinanceManager transactions={transactions} fixedExpenses={fixedExpenses} />
+      {/* Passamos todos os dados brutos para o Client fazer a mágica visual e os filtros */}
+      <ClientFinanceManager 
+        transactions={transactions} 
+        fixedExpenses={fixedExpenses} 
+        employees={employees}
+        tenantConfig={tenant}
+      />
     </>
   );
 }

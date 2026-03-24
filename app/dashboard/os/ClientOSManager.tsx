@@ -2,12 +2,12 @@
 "use client";
 
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
-import { Search, Plus, Trash2, FileText, Printer, MessageCircle, Settings, Car, Gauge, ShieldCheck, AlignLeft, HardHat, Wrench, Eye, Edit3, X, Save, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Filter, ArrowUp, ArrowDown, CalendarClock } from "lucide-react";
+import { Search, Plus, Trash2, FileText, Printer, MessageCircle, Settings, Car, Gauge, ShieldCheck, AlignLeft, HardHat, Wrench, Eye, Edit3, X, Save, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Filter, ArrowUp, ArrowDown, CalendarClock, CreditCard, Smartphone, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -43,6 +43,10 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
   const [openViewOS, setOpenViewOS] = useState(false); 
   const [isEditing, setIsEditing] = useState(false); 
   const [selectedOS, setSelectedOS] = useState<any | null>(null);
+
+  // Estados para Finalização e Pagamento
+  const [completingOS, setCompletingOS] = useState<any | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState("PIX");
   
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
@@ -50,6 +54,10 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     content: () => printRef.current, 
     documentTitle: `OS_${selectedOS?.number || '000'}`,
   } as any);
+
+  // Filtra Catálogos
+  const physicalProducts = useMemo(() => products.filter(p => !p.isService), [products]);
+  const serviceProducts = useMemo(() => products.filter(p => p.isService), [products]);
 
   // Reseta para a página 1 sempre que os filtros mudarem
   useEffect(() => {
@@ -113,9 +121,13 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     setItems(items.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value };
-        if (field === "productId" && value) {
-          const prod = products.find(p => p.id === value);
-          if (prod) { updated.name = prod.name; updated.unitPrice = prod.sellingPrice; }
+        if (field === "productId") {
+          if (value === "MANUAL") {
+             updated.productId = ""; updated.name = ""; updated.unitPrice = 0;
+          } else {
+             const prod = products.find(p => p.id === value);
+             if (prod) { updated.name = prod.name; updated.unitPrice = prod.sellingPrice; }
+          }
         }
         updated.total = updated.quantity * updated.unitPrice;
         return updated;
@@ -217,45 +229,33 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     if (e) e.stopPropagation();
     if (!os.customer.phone) { toast.error("Cliente sem telefone."); return; }
     
-    let financeMsg = `\nTotal do Orçamento: *${formatBRL(os.total)}*`;
+    const remaining = Math.max(0, os.total - (os.advancePayment || 0));
+    let financeMsg = `\nTotal do Serviço: *${formatBRL(os.total)}*`;
+    
     if (os.status !== "COMPLETED" && os.advancePayment > 0) {
-      financeMsg += `\nSinal Recebido: *${formatBRL(os.advancePayment)}*`;
-      financeMsg += `\nFalta Pagar: *${formatBRL(os.total - os.advancePayment)}*`;
+      financeMsg += `\nSinal Pago: *${formatBRL(os.advancePayment)}*`;
+      financeMsg += `\nFalta Pagar: *${formatBRL(remaining)}*`;
     } else if (os.status === "COMPLETED") {
-      financeMsg = `\nValor Pago: *${formatBRL(os.total)}* (Serviço Finalizado)`;
+      financeMsg = `\nValor Total Pago: *${formatBRL(os.total)}* (Serviço Finalizado)`;
     }
 
-    const msg = `Olá ${os.customer.name}, tudo bem? Aqui é da ${tenant?.name || 'Oficina'}.\nSegue o resumo para o seu ${os.vehicle.brand} ${os.vehicle.model} (${os.vehicle.plate}):\n${financeMsg}\n\nQualquer dúvida, estamos à disposição!`;
+    const msg = `Olá *${os.customer.name}*, tudo bem? Aqui é da ${tenant?.name || 'Oficina'}.\nSegue o resumo da sua OS #${os.number} para o ${os.vehicle.brand} ${os.vehicle.model}:\n${financeMsg}\n\nQualquer dúvida, estamos à disposição!`;
     const url = `https://wa.me/55${os.customer.phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
   }, [tenant?.name]);
 
-  const handleCompleteOS = useCallback(async (e: any, os: any) => {
+  const handleCompleteClick = (e: any, os: any) => {
     if (e) e.stopPropagation();
-    const balance = os.total - (os.advancePayment || 0);
-    const msg = os.advancePayment > 0 
-      ? `A OS já teve um adiantamento de ${formatBRL(os.advancePayment)}. Deseja finalizar e lançar o restante de ${formatBRL(balance)} no caixa?`
-      : `Deseja finalizar a OS #${os.number} e lançar ${formatBRL(os.total)} no caixa financeiro?`;
-      
-    if(!confirm(msg)) return;
+    setCompletingOS(os);
+  };
 
+  const confirmCompleteOS = async () => {
     try {
-      await updateOrderStatus(os.id, "COMPLETED", "Dinheiro/Pix"); 
-      toast.success("OS Finalizada e lançada no Caixa!");
+      await updateOrderStatus(completingOS.id, "COMPLETED", paymentMethod); 
+      toast.success("OS Finalizada e Lançada no Caixa!");
+      setCompletingOS(null);
       setOpenViewOS(false);
     } catch { toast.error("Erro ao finalizar OS."); }
-  }, []);
-
-  const handleApproveOS = async (e: any, os: any) => {
-    if (e) e.stopPropagation();
-    if(!confirm(`Deseja aprovar o orçamento da OS #${os.number}? O status mudará para "Aprovado".`)) return;
-    try {
-      await updateOrderStatus(os.id, "APPROVED"); 
-      toast.success("Orçamento aprovado!");
-      if (openViewOS) setOpenViewOS(false);
-    } catch {
-      toast.error("Erro ao aprovar orçamento.");
-    }
   };
 
   const handleStatusChange = useCallback(async (e: any, os: any, newStatus: string) => {
@@ -263,7 +263,11 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     if (os.status === newStatus) return; 
 
     if (newStatus === "COMPLETED") {
-      return handleCompleteOS(e, os);
+      return handleCompleteClick(e, os);
+    }
+
+    if (newStatus === "APPROVED" && os.status === "PENDING") {
+      if(!confirm(`Deseja aprovar o orçamento da OS #${os.number}? Isso criará as projeções "A Receber" no seu painel financeiro.`)) return;
     }
 
     try {
@@ -273,7 +277,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
     } catch {
       toast.error("Erro ao atualizar o status da OS.");
     }
-  }, [handleCompleteOS]);
+  }, []);
 
   const handleDeleteOS = useCallback(async (e: any, os: any) => {
     if (e) e.stopPropagation();
@@ -291,6 +295,8 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
 
   const memoizedPDF = useMemo(() => {
     if (!selectedOS) return null;
+    const remaining = Math.max(0, selectedOS.total - (selectedOS.advancePayment || 0));
+
     return (
       <div className="print-container bg-white text-black p-[10mm] w-[210mm] min-h-[297mm] mx-auto text-sm font-sans" style={{ color: 'black' }}>
         <div className="flex justify-between items-start border-b-2 border-zinc-800 pb-4 mb-6">
@@ -397,13 +403,13 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
               <>
                 {selectedOS.advancePayment > 0 && (
                   <div className="flex justify-between px-3 py-1.5 border-b border-zinc-200 bg-yellow-50 text-yellow-700">
-                    <span className="text-xs font-bold uppercase">Sinal Recebido</span>
+                    <span className="text-xs font-bold uppercase">Sinal Pago</span>
                     <span className="text-xs font-bold">- {formatBRL(selectedOS.advancePayment)}</span>
                   </div>
                 )}
                 <div className="flex justify-between px-4 py-3 bg-zinc-900 text-white">
-                  <span className="text-sm font-black uppercase tracking-wider">Restante a Pagar</span>
-                  <span className="text-lg font-black">{formatBRL(Math.max(0, selectedOS.total - (selectedOS.advancePayment || 0)))}</span>
+                  <span className="text-sm font-black uppercase tracking-wider">Falta Pagar</span>
+                  <span className="text-lg font-black">{formatBRL(remaining)}</span>
                 </div>
               </>
             )}
@@ -454,6 +460,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
           {paginatedOrders.map(os => {
             const isCompleted = os.status === "COMPLETED";
             const hasAdvance = os.advancePayment > 0;
+            const remaining = Math.max(0, os.total - (os.advancePayment || 0));
             
             return (
             <TableRow key={os.id} className="group hover:bg-zinc-50 dark:hover:bg-zinc-800/50 dark:border-zinc-800 cursor-pointer" onClick={() => openOSDetails(os)}>
@@ -473,17 +480,23 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
               <TableCell className="max-w-[250px] truncate text-sm text-zinc-600 dark:text-zinc-400 hidden md:table-cell">{os.problem || "Não informado"}</TableCell>
               
               <TableCell className="text-right">
-                <p className="font-black text-zinc-900 dark:text-zinc-100 text-base">{formatBRL(os.total)}</p>
-                
                 {isCompleted ? (
-                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 mt-1 uppercase text-[9px] tracking-widest border-0">
-                    <CheckCircle2 className="w-3 h-3 mr-1" /> 100% Pago
-                  </Badge>
-                ) : hasAdvance ? (
-                  <Badge variant="outline" className="text-yellow-700 bg-yellow-50 border-yellow-200 hover:bg-yellow-50 dark:bg-yellow-950/20 dark:text-yellow-500 dark:border-yellow-900/50 mt-1 font-bold text-[10px]">
-                    Pago: {formatBRL(os.advancePayment)}
-                  </Badge>
-                ) : null}
+                  <>
+                    <p className="font-black text-zinc-400 dark:text-zinc-600 text-lg line-through">{formatBRL(os.total)}</p>
+                    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 mt-1 uppercase text-[9px] tracking-widest border-0">
+                      <CheckCircle2 className="w-3 h-3 mr-1" /> Pago
+                    </Badge>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-black text-emerald-600 dark:text-emerald-400 text-xl">{formatBRL(remaining)}</p>
+                    {hasAdvance && (
+                      <Badge variant="outline" className="text-yellow-700 bg-yellow-50 border-yellow-200 hover:bg-yellow-50 dark:bg-yellow-950/20 dark:text-yellow-500 dark:border-yellow-900/50 mt-1 font-bold text-[10px]">
+                        Sinal Pago: {formatBRL(os.advancePayment)}
+                      </Badge>
+                    )}
+                  </>
+                )}
               </TableCell>
 
               <TableCell className="text-right">
@@ -491,7 +504,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                   <Button variant="ghost" size="icon" className="text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800" title="Ver Detalhes"><Eye className="w-4 h-4"/></Button>
                   
                   {!isCompleted && (
-                    <Button variant="ghost" size="icon" className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-500 dark:hover:bg-emerald-950/30" onClick={(e) => handleCompleteOS(e, os)} title="Finalizar e Lançar no Caixa">
+                    <Button variant="ghost" size="icon" className="text-emerald-600 hover:bg-emerald-50 dark:text-emerald-500 dark:hover:bg-emerald-950/30" onClick={(e) => handleCompleteClick(e, os)} title="Finalizar e Lançar no Caixa">
                       <ShieldCheck className="w-4 h-4"/>
                     </Button>
                   )}
@@ -540,7 +553,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
         </div>
       )}
     </div>
-  ), [paginatedOrders, filteredAndSortedOrders.length, currentPage, totalPages, openOSDetails, handleCompleteOS, handleWhatsApp, triggerPDFPrint, handleDeleteOS]);
+  ), [paginatedOrders, filteredAndSortedOrders.length, currentPage, totalPages, openOSDetails, handleCompleteClick, handleWhatsApp, triggerPDFPrint, handleDeleteOS]);
 
   return (
     <div className="space-y-6">
@@ -661,10 +674,10 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                             <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "READY")}>
                               <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-teal-500"></div> Pronto / Retirada</div>
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "COMPLETED")}>
-                              <div className="flex items-center gap-2 font-medium text-zinc-700 dark:text-zinc-300"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Finalizada</div>
+                            <DropdownMenuItem className="cursor-pointer" onClick={(e) => handleCompleteClick(e, selectedOS)}>
+                              <div className="flex items-center gap-2 font-medium text-emerald-600 dark:text-emerald-400"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Finalizar e Receber</div>
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600 focus:text-red-600 cursor-pointer" onClick={(e) => handleStatusChange(e, selectedOS, "CANCELED")}>
+                            <DropdownMenuItem className="text-red-600 focus:text-red-600 cursor-pointer border-t dark:border-zinc-800 mt-2 pt-2" onClick={(e) => handleStatusChange(e, selectedOS, "CANCELED")}>
                               <div className="flex items-center gap-2 font-medium"><div className="w-2 h-2 rounded-full bg-zinc-500"></div> Cancelada</div>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -703,7 +716,7 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                     </Button>
                   )}
                   {selectedOS?.status !== "COMPLETED" && (
-                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={(e) => handleCompleteOS(e, selectedOS)}>
+                    <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={(e) => handleCompleteClick(e, selectedOS)}>
                       <ShieldCheck className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">Finalizar</span>
                     </Button>
                   )}
@@ -841,21 +854,39 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
                 {items.length === 0 && <div className="py-8 text-center border-2 border-dashed dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-950"><p className="text-sm text-zinc-500">Nenhum item adicionado.</p></div>}
                 {items.map((item) => (
                   <div key={item.id} className={`flex flex-col md:flex-row gap-4 md:items-end p-4 rounded-xl border dark:border-zinc-800 shadow-sm ${item.isLabor ? 'bg-orange-50/10 dark:bg-orange-950/5' : 'bg-blue-50/10 dark:bg-blue-950/5'}`}>
-                    <div className="w-full md:flex-1 space-y-1.5">
-                      <label className={`text-[10px] uppercase font-black tracking-wider ${item.isLabor ? 'text-orange-600' : 'text-blue-600'}`}>{item.isLabor ? 'Descrição do Serviço' : 'Peça do Estoque'}</label>
-                      {!item.isLabor ? (
-                        <Select onValueChange={(val) => updateItem(item.id, "productId", val)} value={item.productId} disabled={!isEditing && !openNewOS}>
-                          <SelectTrigger className={`h-10 ${!isEditing && !openNewOS ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`}>
-                            <SelectValue placeholder="Buscar peça...">
-                              {item.productId ? products.find(p => p.id === item.productId)?.name : "Buscar peça..."}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent className="dark:bg-zinc-900 dark:border-zinc-800">{products.map(p => <SelectItem key={p.id} value={p.id}>{p.name} - {formatBRL(p.sellingPrice)}</SelectItem>)}</SelectContent>
-                        </Select>
-                      ) : (
-                        <Input className={`h-10 ${!isEditing && !openNewOS ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`} value={item.name} onChange={e => updateItem(item.id, "name", e.target.value)} readOnly={!isEditing && !openNewOS} />
-                      )}
+                    
+                    <div className="w-full md:flex-1 space-y-1.5 flex flex-col sm:flex-row gap-2 sm:items-end">
+                      <div className="flex-1 space-y-1.5">
+                        <label className={`text-[10px] uppercase font-black tracking-wider ${item.isLabor ? 'text-orange-600' : 'text-blue-600'}`}>{item.isLabor ? 'Descrição do Serviço' : 'Peça do Estoque'}</label>
+                        {!isEditing && !openNewOS ? (
+                          <div className="h-10 flex items-center px-3 text-sm font-bold bg-transparent border-dashed border dark:border-zinc-700 rounded-md">
+                            {item.name || "Item não identificado"}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <Select onValueChange={(val) => updateItem(item.id, "productId", val)} value={item.productId || "MANUAL"}>
+                              <SelectTrigger className={`h-10 sm:w-[180px] shrink-0 bg-white dark:bg-zinc-950 dark:border-zinc-800`}>
+                                <SelectValue placeholder="Catálogo..." />
+                              </SelectTrigger>
+                              <SelectContent className="dark:bg-zinc-900 dark:border-zinc-800">
+                                <SelectItem value="MANUAL" className="font-bold text-blue-600">✏️ Digitar Avulso</SelectItem>
+                                {(item.isLabor ? serviceProducts : physicalProducts).map(p => (
+                                  <SelectItem key={p.id} value={p.id}>{p.name} - {formatBRL(p.sellingPrice)}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Input 
+                              placeholder="Descrição do item..." 
+                              value={item.name} 
+                              onChange={e => updateItem(item.id, "name", e.target.value)} 
+                              className="h-10 bg-white dark:bg-zinc-950 dark:border-zinc-800" 
+                              readOnly={!!item.productId && item.productId !== "MANUAL"} 
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
+
                     <div className="flex gap-3 w-full md:w-auto items-end">
                       <div className="w-20 space-y-1.5 shrink-0"><label className="text-[10px] uppercase font-bold text-zinc-500">Qtd</label><Input className={`h-10 text-center font-bold ${!isEditing && !openNewOS ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`} type="number" min="1" value={item.quantity} onChange={e => updateItem(item.id, "quantity", parseInt(e.target.value) || 0)} readOnly={!isEditing && !openNewOS} /></div>
                       <div className="flex-1 md:w-32 space-y-1.5"><label className="text-[10px] uppercase font-bold text-zinc-500">Unitário</label><Input className={`h-10 ${!isEditing && !openNewOS ? 'bg-transparent border-dashed' : 'bg-white dark:bg-zinc-950'} dark:border-zinc-800`} type="number" step="0.01" value={item.unitPrice} onChange={e => updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)} readOnly={!isEditing && !openNewOS} /></div>
@@ -895,6 +926,46 @@ export function ClientOSManager({ initialOrders, customers, products, tenant, em
               <p className="text-3xl md:text-4xl font-black text-emerald-400">{formatBRL(Math.max(0, grandTotal - advancePayment))}</p>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL DE PAGAMENTO PARA FINALIZAR A OS */}
+      <Dialog open={!!completingOS} onOpenChange={(open) => !open && setCompletingOS(null)}>
+        <DialogContent className="w-[90vw] max-w-md dark:bg-zinc-950 dark:border-zinc-800 rounded-xl p-0 overflow-hidden">
+          <div className="p-6 border-b dark:border-zinc-800 bg-emerald-600 text-white">
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+              <ShieldCheck className="w-6 h-6" /> Finalizar e Receber OS
+            </DialogTitle>
+          </div>
+          <div className="p-6 space-y-6">
+            <div className="bg-zinc-50 dark:bg-zinc-900 p-4 rounded-lg border dark:border-zinc-800 text-center space-y-2">
+              <p className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Valor do Fechamento</p>
+              <p className="text-4xl font-black text-zinc-900 dark:text-zinc-100">{formatBRL(Math.max(0, (completingOS?.total || 0) - (completingOS?.advancePayment || 0)))}</p>
+              {completingOS?.advancePayment > 0 && <p className="text-[10px] text-yellow-600 uppercase font-bold mt-1">Já abati o sinal de {formatBRL(completingOS.advancePayment)}!</p>}
+            </div>
+
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Meio de Pagamento do Saldo</label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger className="h-14 text-lg font-bold dark:bg-zinc-900 dark:border-zinc-800">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="dark:bg-zinc-900 dark:border-zinc-800">
+                  <SelectItem value="PIX"><div className="flex items-center gap-2"><Smartphone className="w-5 h-5 text-emerald-500"/> PIX</div></SelectItem>
+                  <SelectItem value="Cartão de Crédito"><div className="flex items-center gap-2"><CreditCard className="w-5 h-5 text-blue-500"/> Cartão de Crédito</div></SelectItem>
+                  <SelectItem value="Cartão de Débito"><div className="flex items-center gap-2"><CreditCard className="w-5 h-5 text-orange-500"/> Cartão de Débito</div></SelectItem>
+                  <SelectItem value="Dinheiro"><div className="flex items-center gap-2"><Banknote className="w-5 h-5 text-green-600"/> Dinheiro / Espécie</div></SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-zinc-500 mt-2 leading-relaxed">Isso vai lançar o valor como "Pago" no Caixa Financeiro e dar baixa definitiva nas peças do Estoque.</p>
+            </div>
+          </div>
+          <DialogFooter className="p-4 border-t dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/50 flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" className="w-full sm:w-auto h-12" onClick={() => setCompletingOS(null)}>Cancelar</Button>
+            <Button onClick={confirmCompleteOS} className="w-full sm:w-auto h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base">
+              Confirmar Pagamento
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

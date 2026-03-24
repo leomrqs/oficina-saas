@@ -29,10 +29,37 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   const params = await searchParams;
 
-  const now = new Date();
-  let startDate = new Date(now.getFullYear(), now.getMonth(), 1); 
-  let endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { billingCycleDay: true }
+  });
 
+  const cycleDay = tenant?.billingCycleDay || 1;
+  const now = new Date();
+
+  // ============================================================================
+  // 🧠 LÓGICA DE CICLO FINANCEIRO (Servidor)
+  // ============================================================================
+  let startDate = new Date(now.getFullYear(), now.getMonth(), cycleDay, 0, 0, 0); 
+  let endDate = new Date(now.getFullYear(), now.getMonth() + 1, cycleDay - 1, 23, 59, 59, 999);
+
+  if (now.getDate() < cycleDay) {
+    startDate = new Date(now.getFullYear(), now.getMonth() - 1, cycleDay, 0, 0, 0);
+    endDate = new Date(now.getFullYear(), now.getMonth(), cycleDay - 1, 23, 59, 59, 999);
+  }
+
+  // Prepara strings blindadas contra Fuso Horário para mandar para o Calendário
+  const formatLocal = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const defaultFromStr = formatLocal(startDate);
+  const defaultToStr = formatLocal(endDate);
+
+  // Se usuário filtrou manualmente pela URL
   if (params?.from && params?.to) {
     startDate = new Date(`${params.from}T00:00:00`);
     endDate = new Date(`${params.to}T23:59:59`);
@@ -42,6 +69,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const prevStartDate = new Date(startDate.getTime() - diffTime - 1);
   const prevEndDate = new Date(startDate.getTime() - 1);
 
+  // ============================================================================
+  // BUSCAS (QUERIES) NO BANCO DE DADOS
+  // ============================================================================
   const currentPeriodIncome = await prisma.financialTransaction.aggregate({
     where: { tenantId, type: "INCOME", status: "PAID", paymentDate: { gte: startDate, lte: endDate } },
     _sum: { amount: true }
@@ -67,10 +97,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     where: { tenantId, updatedAt: { gte: startDate, lte: endDate }, status: { in: ["APPROVED", "COMPLETED"] } }
   });
 
-  const allProducts = await prisma.product.findMany({
-    where: { tenantId }, select: { id: true, name: true, sku: true, stock: true, minStock: true }
+  // Apenas Peças Físicas no Estoque Crítico
+  const physicalProducts = await prisma.product.findMany({
+    where: { tenantId, isService: false }, 
+    select: { id: true, name: true, sku: true, stock: true, minStock: true }
   });
-  const criticalProductsAll = allProducts.filter(p => p.stock <= p.minStock).sort((a, b) => a.stock - b.stock);
+  const criticalProductsAll = physicalProducts.filter(p => p.stock <= p.minStock).sort((a, b) => a.stock - b.stock);
   const topCriticalProducts = criticalProductsAll.slice(0, 6);
 
   const transactions = await prisma.financialTransaction.findMany({
@@ -84,7 +116,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   if (groupBy === 'day') {
     for(let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-       const key = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+       const key = formatLocal(d).split('-').reverse().slice(0,2).join('/'); // MM/DD -> DD/MM
        dataMap.set(key, { name: key, receitas: 0, despesas: 0 });
     }
   } else {
@@ -99,7 +131,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     if (!t.paymentDate) return;
     const d = new Date(t.paymentDate);
     let key = "";
-    if (groupBy === 'day') key = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    if (groupBy === 'day') key = formatLocal(d).split('-').reverse().slice(0,2).join('/');
     else {
       const monthYear = d.toLocaleString('pt-BR', { month: 'short', year: '2-digit' });
       key = monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
@@ -126,7 +158,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     { name: "Canceladas", value: osStatusCount.find(x => x.status === "CANCELED")?._count || 0, fill: "#ef4444" },
   ];
 
-  // Identifica a ordenação das OS pelo parametro na URL
   const osOrderDirection = params?.osOrder === 'asc' ? 'asc' : 'desc';
 
   const recentOrders = await prisma.order.findMany({
@@ -147,7 +178,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     }
   };
 
-  // Prepara a query string para não perder os filtros de data ao clicar na ordenação
   const currentQuery = new URLSearchParams();
   if (params?.from) currentQuery.set("from", params.from);
   if (params?.to) currentQuery.set("to", params.to);
@@ -159,11 +189,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <div className="flex items-center justify-between space-y-2 mb-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Visão Geral da Oficina</h2>
-          <p className="text-zinc-500 text-sm">Acompanhe os resultados e métricas no período selecionado.</p>
+          <p className="text-zinc-500 text-sm">Acompanhe os resultados e métricas do seu ciclo contábil.</p>
         </div>
       </div>
 
-      <DashboardFilter />
+      <DashboardFilter cycleDay={cycleDay} defaultFrom={defaultFromStr} defaultTo={defaultToStr} />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="transition-all duration-300 hover:shadow-md border-l-4 border-l-emerald-500">
@@ -182,7 +212,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         <Card className="transition-all duration-300 hover:shadow-md border-l-4 border-l-yellow-400">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Orçamentos (No Período)</CardTitle>
+            <CardTitle className="text-sm font-medium">Orçamentos Pendentes</CardTitle>
             <FileText className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
@@ -193,22 +223,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         <Card className="transition-all duration-300 hover:shadow-md border-l-4 border-l-blue-500">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Serviços (No Período)</CardTitle>
+            <CardTitle className="text-sm font-medium">Serviços no Pátio</CardTitle>
             <Wrench className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{servicesInPeriodCount}</div>
-            <p className="text-xs text-zinc-500 mt-1">Aprovados ou finalizados</p>
+            <p className="text-xs text-zinc-500 mt-1">Em serviço ou concluídos</p>
           </CardContent>
         </Card>
 
         <Card className={`transition-all duration-300 hover:shadow-md border-l-4 ${criticalProductsAll.length > 0 ? 'border-l-red-500 bg-red-50/30 dark:bg-red-950/20' : 'border-l-zinc-300'}`}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className={`text-sm font-medium ${criticalProductsAll.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-600 dark:text-zinc-400'}`}>Estoque Crítico Atual</CardTitle>
+            <CardTitle className={`text-sm font-medium ${criticalProductsAll.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-600 dark:text-zinc-400'}`}>Risco de Ruptura</CardTitle>
             <AlertTriangle className={`h-4 w-4 ${criticalProductsAll.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-500 dark:text-zinc-400'}`} />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${criticalProductsAll.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-zinc-100'}`}>{criticalProductsAll.length} itens</div>
+            <div className={`text-2xl font-bold ${criticalProductsAll.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-zinc-100'}`}>{criticalProductsAll.length} peças</div>
             <p className={`text-xs mt-1 ${criticalProductsAll.length > 0 ? 'text-red-500 font-medium' : 'text-zinc-500 dark:text-zinc-400'}`}>
               {criticalProductsAll.length > 0 ? 'Reposição urgente!' : 'Estoque regular'}
             </p>
@@ -229,8 +259,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         <Card className="col-span-3 transition-all duration-300 hover:shadow-md">
           <CardHeader>
-            <CardTitle>Status das Ordens de Serviço</CardTitle>
-            <CardDescription>Volume de serviços no período.</CardDescription>
+            <CardTitle>Status do Pátio</CardTitle>
+            <CardDescription>Volume de serviços no ciclo.</CardDescription>
           </CardHeader>
           <CardContent>
             <OSStatusChart data={osChartData} />
@@ -242,8 +272,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <Card className="col-span-4 transition-all duration-300 hover:shadow-md flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between border-b dark:border-zinc-800 pb-4">
             <div>
-              <CardTitle>Movimentações do Período (OS)</CardTitle>
-              <CardDescription className="mt-1">Serviços alterados recentemente.</CardDescription>
+              <CardTitle>Últimas Modificações de OS</CardTitle>
+              <CardDescription className="mt-1">Acompanhe a fila de serviços no salão.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Link href={`?${currentQuery.toString()}`}>
@@ -297,19 +327,26 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </Card>
 
         <Card className={`col-span-3 transition-all duration-300 hover:shadow-md flex flex-col ${topCriticalProducts.length > 0 ? 'border-red-100 bg-red-50/10 dark:border-red-900/30 dark:bg-red-950/10' : ''}`}>
-          <CardHeader className="border-b dark:border-zinc-800 pb-4">
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className={`w-5 h-5 ${topCriticalProducts.length > 0 ? 'text-red-500 dark:text-red-400' : 'text-zinc-400'}`} />
-              Painel de Compras (Falta de Estoque)
-            </CardTitle>
-            <CardDescription className="mt-1">Top 6 itens que precisam de reposição.</CardDescription>
+          <CardHeader className="border-b dark:border-zinc-800 pb-4 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className={`w-5 h-5 ${topCriticalProducts.length > 0 ? 'text-red-500 dark:text-red-400' : 'text-zinc-400'}`} />
+                Painel de Compras
+              </CardTitle>
+              <CardDescription className="mt-1">Peças físicas com urgência.</CardDescription>
+            </div>
+            <Link href="/dashboard/estoque">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30">
+                <ShoppingCart className="w-4 h-4"/>
+              </Button>
+            </Link>
           </CardHeader>
           <CardContent className="pt-4 flex-1">
             <div className="space-y-4">
               {topCriticalProducts.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-emerald-500">
                   <CheckCircle2 className="w-10 h-10 mb-3 opacity-80" />
-                  <p className="text-sm font-bold">O estoque está saudável!</p>
+                  <p className="text-sm font-bold">O estoque físico está saudável!</p>
                 </div>
               ) : (
                 topCriticalProducts.map((p) => (
@@ -323,11 +360,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                         <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider mb-1">Mín: {p.minStock}</p>
                         <Badge variant="destructive" className="font-bold text-xs bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600">{p.stock} unid.</Badge>
                       </div>
-                      <Link href="/dashboard/estoque">
-                        <Button variant="outline" size="icon" className="h-8 w-8 text-zinc-400 dark:border-zinc-700 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 dark:hover:bg-blue-950/50 dark:hover:text-blue-400">
-                          <ShoppingCart className="w-4 h-4" />
-                        </Button>
-                      </Link>
                     </div>
                   </div>
                 ))

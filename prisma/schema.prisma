@@ -48,6 +48,7 @@ model Tenant {
   address       String?  
   logoUrl       String?  
   monthlyGoal   Float    @default(50000.0)
+  billingCycleDay Int      @default(1) // NOVO: Dia de Fechamento do Caixa
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -89,7 +90,9 @@ model Employee {
   name      String
   cpf       String?
   phone     String?
-  role      String?  
+  role      String? 
+  salary    Float?   // NOVO: Salário Mensal
+  payDay    Int?     // NOVO: Dia do Pagamento 
   isActive  Boolean  @default(true)
   
   tenantId  String
@@ -167,6 +170,7 @@ model Product {
   sellingPrice Float    @default(0.0)
   stock        Int      @default(0)
   minStock     Int      @default(5) 
+  isService    Boolean  @default(false) // NOVO: Diferencia Peça de Mão de Obra
   
   tenantId     String
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -188,6 +192,10 @@ model InventoryTransaction {
   reason    String?         
   productId String
   product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  orderId   String?         // NOVO: OS que gerou a movimentação (Saída Automática)
+  order     Order?          @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
   tenantId  String
   tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdAt DateTime        @default(now())
@@ -227,6 +235,7 @@ model Order {
 
   items         OrderItem[]
   financials    FinancialTransaction[]
+  inventoryLogs InventoryTransaction[] // CORREÇÃO: Faltava a relação inversa do log de estoque
   mechanics     OrderMechanic[]
   history       OrderHistory[]
 

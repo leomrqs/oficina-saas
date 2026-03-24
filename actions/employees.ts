@@ -10,12 +10,17 @@ export async function createEmployee(formData: FormData) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.tenantId) throw new Error("Não autorizado");
 
+  const salaryStr = formData.get("salary") as string;
+  const payDayStr = formData.get("payDay") as string;
+
   await prisma.employee.create({
     data: {
       name: formData.get("name") as string,
       cpf: formData.get("cpf") as string,
       phone: formData.get("phone") as string,
       role: formData.get("role") as string,
+      salary: salaryStr ? parseFloat(salaryStr) : null,
+      payDay: payDayStr ? parseInt(payDayStr) : null,
       isActive: true,
       tenantId: session.user.tenantId,
     }
@@ -30,6 +35,9 @@ export async function updateEmployee(formData: FormData) {
   if (!session?.user?.tenantId) throw new Error("Não autorizado");
 
   const id = formData.get("id") as string;
+  const salaryStr = formData.get("salary") as string;
+  const payDayStr = formData.get("payDay") as string;
+
   await prisma.employee.update({
     where: { id, tenantId: session.user.tenantId },
     data: {
@@ -37,6 +45,8 @@ export async function updateEmployee(formData: FormData) {
       cpf: formData.get("cpf") as string,
       phone: formData.get("phone") as string,
       role: formData.get("role") as string,
+      salary: salaryStr ? parseFloat(salaryStr) : null,
+      payDay: payDayStr ? parseInt(payDayStr) : null,
     }
   });
 

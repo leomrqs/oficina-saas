@@ -21,24 +21,29 @@ export async function createTransaction(formData: FormData) {
   const dueDate = new Date(`${dueDateStr}T12:00:00Z`); 
   
   const paymentDate = status === "PAID" ? new Date() : null;
+  const paymentMethod = formData.get("paymentMethod") as string | null; // Adicionado
   const notes = formData.get("notes") as string;
 
   await prisma.financialTransaction.create({
     data: {
-      title, type, category, amount, status, dueDate, paymentDate, notes,
+      title, type, category, amount, status, dueDate, paymentDate, paymentMethod, notes,
       tenantId: session.user.tenantId,
     },
   });
   revalidatePath("/dashboard/financeiro");
 }
 
-export async function markAsPaid(id: string) {
+export async function markAsPaid(id: string, paymentMethod?: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.tenantId) throw new Error("Não autorizado");
 
   await prisma.financialTransaction.update({
     where: { id, tenantId: session.user.tenantId },
-    data: { status: "PAID", paymentDate: new Date() },
+    data: { 
+      status: "PAID", 
+      paymentDate: new Date(),
+      ...(paymentMethod && { paymentMethod }) // Salva o meio de pagamento na baixa
+    },
   });
   revalidatePath("/dashboard/financeiro");
 }
@@ -85,20 +90,26 @@ export async function generateMonthlyFixedExpenses() {
   if (!session?.user?.tenantId) throw new Error("Não autorizado");
 
   const tenantId = session.user.tenantId;
+  
+  // Busca Contas Fixas Manuais
   const fixedExpenses = await prisma.fixedExpense.findMany({ where: { tenantId } });
+  
+  // Busca Salários do RH
+  const employees = await prisma.employee.findMany({
+    where: { tenantId, isActive: true, salary: { not: null }, payDay: { not: null } }
+  });
   
   const now = new Date();
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
   let createdCount = 0;
 
+  // Lança Contas Fixas
   for (const exp of fixedExpenses) {
-    // Ajusta o dia para não quebrar em Fevereiro (ex: dia 31 em mês de 28)
     const maxDaysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const clampedDay = Math.min(exp.dueDay, maxDaysInMonth);
     const dueDate = new Date(currentYear, currentMonth, clampedDay, 12, 0, 0);
     
-    // Tag única para saber se já lançou essa conta neste mês/ano específico
     const tag = `FIXED_EXPENSE_${exp.id}_${currentMonth}_${currentYear}`;
     
     const exists = await prisma.financialTransaction.findFirst({
@@ -114,7 +125,38 @@ export async function generateMonthlyFixedExpenses() {
           amount: exp.amount,
           status: "PENDING",
           dueDate: dueDate,
-          notes: tag, // Salva a tag invisível aqui
+          notes: tag,
+          tenantId
+        }
+      });
+      createdCount++;
+    }
+  }
+
+  // Lança Salários da Equipe
+  for (const emp of employees) {
+    if (!emp.salary || !emp.payDay) continue;
+    
+    const maxDaysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const clampedDay = Math.min(emp.payDay, maxDaysInMonth);
+    const dueDate = new Date(currentYear, currentMonth, clampedDay, 12, 0, 0);
+    
+    const tag = `SALARY_EMP_${emp.id}_${currentMonth}_${currentYear}`;
+    
+    const exists = await prisma.financialTransaction.findFirst({
+      where: { tenantId, notes: { contains: tag } }
+    });
+
+    if (!exists) {
+      await prisma.financialTransaction.create({
+        data: {
+          title: `Salário: ${emp.name}`,
+          type: "EXPENSE",
+          category: "Funcionários / Mão de Obra",
+          amount: emp.salary,
+          status: "PENDING",
+          dueDate: dueDate,
+          notes: tag,
           tenantId
         }
       });

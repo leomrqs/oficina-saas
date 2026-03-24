@@ -2,13 +2,14 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Plus, Trash2, Edit, HardHat, Phone, Wrench, Ban, CheckCircle2 } from "lucide-react";
+import { Search, Plus, Trash2, Edit, HardHat, Phone, Wrench, Ban, CheckCircle2, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createEmployee, updateEmployee, deleteEmployee, toggleEmployeeStatus } from "@/actions/employees";
 import { toast } from "sonner";
 
@@ -21,6 +22,8 @@ export function ClientEmployeeManager({ initialData }: { initialData: any[] }) {
     e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.role?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   const handleSave = async (formData: FormData) => {
     try {
@@ -77,32 +80,67 @@ export function ClientEmployeeManager({ initialData }: { initialData: any[] }) {
 
       {/* MODAL DE CADASTRO/EDIÇÃO */}
       <Dialog open={openModal} onOpenChange={setOpenModal}>
-        <DialogContent className="max-w-md bg-white dark:bg-zinc-950 dark:border-zinc-800">
+        <DialogContent className="max-w-lg bg-white dark:bg-zinc-950 dark:border-zinc-800">
           <DialogHeader>
-            <DialogTitle className="text-zinc-900 dark:text-zinc-100">
+            <DialogTitle className="text-zinc-900 dark:text-zinc-100 text-xl flex items-center gap-2">
+              <HardHat className="w-5 h-5 text-blue-500"/>
               {editingEmployee ? "Editar Funcionário" : "Cadastrar Novo Funcionário"}
             </DialogTitle>
           </DialogHeader>
-          <form action={handleSave} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Nome Completo *</label>
-              <Input name="name" defaultValue={editingEmployee?.name} required className="dark:bg-zinc-900 dark:border-zinc-800" placeholder="Ex: Carlos Silva" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+          <form action={handleSave} className="space-y-6 mt-4">
+            
+            <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Cargo / Especialidade *</label>
-                <Input name="role" defaultValue={editingEmployee?.role} required className="dark:bg-zinc-900 dark:border-zinc-800" placeholder="Ex: Mecânico Chefe" />
+                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Nome Completo *</label>
+                <Input name="name" defaultValue={editingEmployee?.name} required className="dark:bg-zinc-900 dark:border-zinc-800 h-10" placeholder="Ex: Carlos Silva" />
               </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Cargo / Função *</label>
+                  <Input name="role" defaultValue={editingEmployee?.role} required className="dark:bg-zinc-900 dark:border-zinc-800 h-10" placeholder="Ex: Mecânico Chefe" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Telefone (Opcional)</label>
+                  <Input name="phone" defaultValue={editingEmployee?.phone} className="dark:bg-zinc-900 dark:border-zinc-800 h-10" placeholder="(11) 99999-9999" />
+                </div>
+              </div>
+              
               <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Telefone (Opcional)</label>
-                <Input name="phone" defaultValue={editingEmployee?.phone} className="dark:bg-zinc-900 dark:border-zinc-800" placeholder="(11) 99999-9999" />
+                <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">CPF (Opcional)</label>
+                <Input name="cpf" defaultValue={editingEmployee?.cpf} className="dark:bg-zinc-900 dark:border-zinc-800 h-10" placeholder="000.000.000-00" />
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">CPF (Opcional)</label>
-              <Input name="cpf" defaultValue={editingEmployee?.cpf} className="dark:bg-zinc-900 dark:border-zinc-800" placeholder="000.000.000-00" />
+
+            {/* SEÇÃO FINANCEIRA / RH */}
+            <div className="bg-zinc-50 dark:bg-zinc-900 p-4 rounded-xl border dark:border-zinc-800 space-y-4">
+              <div className="border-b dark:border-zinc-800 pb-2">
+                <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2"><DollarSign className="w-4 h-4 text-emerald-500"/> Informações Financeiras (RH)</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Isso automatizará o lançamento de salários nas Contas Fixas.</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Salário Mensal (R$)</label>
+                  <Input name="salary" type="number" step="0.01" defaultValue={editingEmployee?.salary || ""} className="bg-white dark:bg-zinc-950 dark:border-zinc-800 h-10" placeholder="Ex: 2500.00" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Dia de Pagamento</label>
+                  <Select name="payDay" defaultValue={editingEmployee?.payDay?.toString() || ""}>
+                    <SelectTrigger className="bg-white dark:bg-zinc-950 dark:border-zinc-800 h-10">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-56 dark:bg-zinc-900 dark:border-zinc-800">
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                        <SelectItem key={d} value={d.toString()}>Todo dia {d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             </div>
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+
+            <Button type="submit" className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white font-bold text-md">
               {editingEmployee ? "Salvar Alterações" : "Cadastrar na Equipe"}
             </Button>
           </form>
@@ -142,6 +180,17 @@ export function ClientEmployeeManager({ initialData }: { initialData: any[] }) {
                   <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
                     <Wrench className="w-3.5 h-3.5" />
                     <span>Participou em <strong>{servicesCount}</strong> OS</span>
+                  </div>
+
+                  {/* Resumo Financeiro (NOVO) */}
+                  <div className="flex items-center justify-between mt-3 bg-zinc-50 dark:bg-zinc-800/50 p-2.5 rounded-md border border-zinc-100 dark:border-zinc-800/80">
+                    <div className="flex items-center gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                      <DollarSign className="w-4 h-4 text-emerald-500" />
+                      <span>{emp.salary ? formatBRL(emp.salary) : 'Sem Salário Fixo'}</span>
+                    </div>
+                    {emp.payDay && (
+                      <Badge variant="outline" className="text-[10px] bg-white dark:bg-zinc-900 font-medium">Dia {emp.payDay}</Badge>
+                    )}
                   </div>
                   
                   <div className="pt-3 border-t dark:border-zinc-800 flex items-center justify-between">

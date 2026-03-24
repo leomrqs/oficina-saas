@@ -15,20 +15,24 @@ export async function createProduct(formData: FormData) {
   const category = formData.get("category") as string;
   const location = formData.get("location") as string;
   const imageUrl = formData.get("imageUrl") as string;
-  const costPrice = parseFloat(formData.get("costPrice") as string);
-  const sellingPrice = parseFloat(formData.get("sellingPrice") as string);
-  const minStock = parseInt(formData.get("minStock") as string);
-  const initialStock = parseInt(formData.get("initialStock") as string);
+  const costPrice = parseFloat(formData.get("costPrice") as string) || 0;
+  const sellingPrice = parseFloat(formData.get("sellingPrice") as string) || 0;
+  
+  // Se for serviço, minStock e initialStock são irrelevantes, forçamos a 0
+  const isService = formData.get("isService") === "true";
+  const minStock = isService ? 0 : parseInt(formData.get("minStock") as string) || 0;
+  const initialStock = isService ? 0 : parseInt(formData.get("initialStock") as string) || 0;
 
   await prisma.$transaction(async (tx) => {
     const product = await tx.product.create({
       data: {
-        name, sku, category, location, imageUrl, costPrice, sellingPrice, minStock, stock: initialStock,
+        name, sku, category, location, imageUrl, costPrice, sellingPrice, 
+        minStock, stock: initialStock, isService,
         tenantId: session.user.tenantId,
       },
     });
 
-    if (initialStock > 0) {
+    if (initialStock > 0 && !isService) {
       await tx.inventoryTransaction.create({
         data: {
           type: "IN", quantity: initialStock, reason: "Estoque Inicial",
@@ -51,12 +55,14 @@ export async function adjustStock(formData: FormData) {
   const reason = formData.get("reason") as string;
 
   await prisma.$transaction(async (tx) => {
+    // 1. Cria o log de movimentação
     await tx.inventoryTransaction.create({
       data: {
         productId, type, quantity, reason, tenantId: session.user.tenantId,
       },
     });
 
+    // 2. Atualiza a quantidade na prateleira
     await tx.product.update({
       where: { id: productId },
       data: {
@@ -77,23 +83,33 @@ export async function updateProduct(formData: FormData) {
   const sku = formData.get("sku") as string;
   const category = formData.get("category") as string;
   const imageUrl = formData.get("imageUrl") as string;
-  const costPrice = parseFloat(formData.get("costPrice") as string);
-  const sellingPrice = parseFloat(formData.get("sellingPrice") as string);
-  const minStock = parseInt(formData.get("minStock") as string);
+  const costPrice = parseFloat(formData.get("costPrice") as string) || 0;
+  const sellingPrice = parseFloat(formData.get("sellingPrice") as string) || 0;
+  
+  // Puxamos se a flag de serviço foi enviada. Se não, mantemos a lógica antiga.
+  const isServiceStr = formData.get("isService");
+  const isService = isServiceStr ? isServiceStr === "true" : undefined;
+  
+  const minStockStr = formData.get("minStock");
+  const minStock = minStockStr ? parseInt(minStockStr as string) : undefined;
 
   await prisma.$transaction(async (tx) => {
-    // 1. Atualiza os dados da peça
+    // 1. Atualiza os dados da peça/serviço
     await tx.product.update({
       where: { id, tenantId: session.user.tenantId },
-      data: { name, sku, category, imageUrl, costPrice, sellingPrice, minStock },
+      data: { 
+        name, sku, category, imageUrl, costPrice, sellingPrice,
+        ...(minStock !== undefined && { minStock }),
+        ...(isService !== undefined && { isService })
+      },
     });
 
-    // 2. Registra no log do histórico (quantidade 0, pois é só edição de dados)
+    // 2. Registra no log do histórico que o item foi editado
     await tx.inventoryTransaction.create({
       data: {
         type: "EDIT", 
         quantity: 0, 
-        reason: "Atualização de dados cadastrais da peça",
+        reason: "Atualização de dados cadastrais",
         productId: id, 
         tenantId: session.user.tenantId,
       },

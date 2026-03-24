@@ -15,14 +15,18 @@ export async function updateTenantSettings(formData: FormData) {
   const phone = formData.get("phone") as string;
   const address = formData.get("address") as string;
   const logoUrl = formData.get("logoUrl") as string;
+  const billingCycleDayStr = formData.get("billingCycleDay") as string;
+  
+  const billingCycleDay = billingCycleDayStr ? parseInt(billingCycleDayStr, 10) : 1;
 
   await prisma.tenant.update({
     where: { id: session.user.tenantId },
-    data: { name, cnpj, phone, address, logoUrl },
+    data: { name, cnpj, phone, address, logoUrl, billingCycleDay },
   });
 
   revalidatePath("/dashboard/configuracoes");
   revalidatePath("/dashboard"); 
+  revalidatePath("/dashboard/financeiro"); // Garante que o financeiro saiba da mudança
 }
 
 export async function updateMonthlyGoal(goal: number) {
