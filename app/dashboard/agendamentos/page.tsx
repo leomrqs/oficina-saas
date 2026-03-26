@@ -27,7 +27,7 @@ export default async function AgendamentosPage() {
     include: {
       customer: { select: { name: true, phone: true } },
       vehicle: { select: { plate: true, brand: true, model: true } },
-      order: { select: { number: true, status: true } }
+      order: { select: { id: true, number: true, status: true } }
     },
     orderBy: [
       { date: 'asc' },
@@ -59,12 +59,17 @@ export default async function AgendamentosPage() {
 
   return (
     <>
-      <div className="flex items-center justify-between space-y-2 mb-6">
+      <div className="flex items-center gap-3 mb-6 animate-in fade-in slide-in-from-top-2 duration-500">
+        <div className="p-2.5 rounded-xl bg-blue-600 shadow-lg shadow-blue-600/30 dark:shadow-blue-600/15 shrink-0">
+          <CalendarDays className="w-5 h-5 text-white" />
+        </div>
         <div>
-          <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2 dark:text-white">
-            <CalendarDays className="h-8 w-8 text-zinc-900 dark:text-zinc-100" /> Agenda da Oficina
+          <h2 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">
+            Agenda da Oficina
           </h2>
-          <p className="text-zinc-500 dark:text-zinc-400">Controle de clientes agendados e geração rápida de Ordem de Serviço.</p>
+          <p className="text-zinc-500 dark:text-zinc-400 text-sm">
+            Controle de clientes agendados e geração rápida de OS.
+          </p>
         </div>
       </div>
 

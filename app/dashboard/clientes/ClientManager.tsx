@@ -287,9 +287,26 @@ export function ClientManager({ initialData }: { initialData: Customer[] }) {
       {/* CARDS DE CLIENTES */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {filteredCustomers.length === 0 && (
-          <div className="col-span-full text-center py-12 bg-white dark:bg-zinc-900 border border-dashed dark:border-zinc-800 rounded-lg">
-            <User className="mx-auto h-8 w-8 text-zinc-300 dark:text-zinc-600 mb-3" />
-            <p className="text-zinc-500 font-medium">Nenhum cliente encontrado.</p>
+          <div className="col-span-full flex flex-col items-center justify-center py-16 px-4 text-center bg-white dark:bg-zinc-900 border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl animate-in fade-in zoom-in-95 duration-300">
+            <div className="rounded-full bg-zinc-100 dark:bg-zinc-800/80 p-5 mb-4 ring-1 ring-zinc-200 dark:ring-zinc-700">
+              <User className="w-10 h-10 text-zinc-300 dark:text-zinc-600" />
+            </div>
+            <h3 className="font-bold text-zinc-700 dark:text-zinc-200 text-lg mb-1">
+              {searchTerm ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
+            </h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm leading-relaxed">
+              {searchTerm
+                ? `Nenhum resultado para "${searchTerm}". Verifique o nome, placa ou CPF.`
+                : "Cadastre o primeiro cliente para começar a gerir os serviços da oficina."}
+            </p>
+            {!searchTerm && (
+              <Button
+                className="mt-5 bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                onClick={() => setOpenNewClient(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" /> Cadastrar Primeiro Cliente
+              </Button>
+            )}
           </div>
         )}
 

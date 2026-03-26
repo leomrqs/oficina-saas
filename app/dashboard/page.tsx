@@ -383,70 +383,161 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <div className="flex items-center justify-between space-y-2 mb-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Visão Geral da Oficina</h2>
-          <p className="text-zinc-500 text-sm">Acompanhe os resultados e métricas do seu ciclo contábil.</p>
+      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-6 animate-in fade-in slide-in-from-top-2 duration-500">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-blue-600 shadow-lg shadow-blue-600/30 dark:shadow-blue-600/15 shrink-0">
+            <Wrench className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">
+              Visão Geral da Oficina
+            </h2>
+            <p className="text-zinc-500 dark:text-zinc-400 text-sm">
+              Acompanhe os resultados do seu ciclo contábil.
+            </p>
+          </div>
         </div>
       </div>
 
       <DashboardFilter cycleDay={cycleDay} defaultFrom={defaultFromStr} defaultTo={defaultToStr} />
 
+      {/* ── KPI CARDS ──────────────────────────────────────────────────────── */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="transition-all duration-300 hover:shadow-md border-l-4 border-l-emerald-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Receita do Período</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-500" />
+
+        {/* Receita */}
+        <Card
+          className="group transition-all duration-300 hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-zinc-800/60 border-l-4 border-l-emerald-500 cursor-default animate-in fade-in slide-in-from-bottom-4 duration-500"
+          style={{ animationDelay: "0ms" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">
+              Receita do Período
+            </CardTitle>
+            <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 shrink-0 group-hover:scale-110 transition-transform duration-200">
+              <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatBRL(revCurrent)}</div>
-            <p className={`text-xs flex items-center mt-1 font-medium ${revPercent >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-              {revPercent >= 0 ? <ArrowUpRight className="w-3 h-3 mr-1"/> : <ArrowDownRight className="w-3 h-3 mr-1"/>}
-              {Math.abs(revPercent).toFixed(1)}% vs Período Anterior
+          <CardContent className="pt-0">
+            <div className="text-3xl font-black text-zinc-900 dark:text-zinc-100 tabular-nums mb-2">
+              {formatBRL(revCurrent)}
+            </div>
+            <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${
+              revPercent >= 0
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+            }`}>
+              {revPercent >= 0
+                ? <ArrowUpRight className="w-3 h-3" />
+                : <ArrowDownRight className="w-3 h-3" />}
+              {Math.abs(revPercent).toFixed(1)}% vs anterior
+            </span>
+          </CardContent>
+        </Card>
+
+        {/* Orçamentos Pendentes */}
+        <Card
+          className="group transition-all duration-300 hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-zinc-800/60 border-l-4 border-l-yellow-400 cursor-default animate-in fade-in slide-in-from-bottom-4 duration-500"
+          style={{ animationDelay: "75ms" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">
+              Orçamentos Pendentes
+            </CardTitle>
+            <div className="p-2 rounded-lg bg-yellow-50 dark:bg-yellow-500/10 shrink-0 group-hover:scale-110 transition-transform duration-200">
+              <FileText className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="text-3xl font-black text-zinc-900 dark:text-zinc-100 tabular-nums mb-2">
+              {pendingOrdersCount}
+            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+              Aguardando aprovação do cliente
             </p>
           </CardContent>
         </Card>
 
-        <Card className="transition-all duration-300 hover:shadow-md border-l-4 border-l-yellow-400">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Orçamentos Pendentes</CardTitle>
-            <FileText className="h-4 w-4 text-yellow-500" />
+        {/* Serviços no Pátio */}
+        <Card
+          className="group transition-all duration-300 hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-zinc-800/60 border-l-4 border-l-blue-500 cursor-default animate-in fade-in slide-in-from-bottom-4 duration-500"
+          style={{ animationDelay: "150ms" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className="text-sm font-semibold text-zinc-500 dark:text-zinc-400">
+              Serviços no Pátio
+            </CardTitle>
+            <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-500/10 shrink-0 group-hover:scale-110 transition-transform duration-200">
+              <Wrench className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendingOrdersCount}</div>
-            <p className="text-xs text-zinc-500 mt-1">Aguardando aprovação</p>
+          <CardContent className="pt-0">
+            <div className="text-3xl font-black text-zinc-900 dark:text-zinc-100 tabular-nums mb-2">
+              {servicesInPeriodCount}
+            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 font-medium">
+              Em serviço ou concluídos no período
+            </p>
           </CardContent>
         </Card>
 
-        <Card className="transition-all duration-300 hover:shadow-md border-l-4 border-l-blue-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Serviços no Pátio</CardTitle>
-            <Wrench className="h-4 w-4 text-blue-500" />
+        {/* Risco de Ruptura */}
+        <Card
+          className={`group transition-all duration-300 hover:-translate-y-1 hover:shadow-lg dark:hover:shadow-zinc-800/60 border-l-4 cursor-default animate-in fade-in slide-in-from-bottom-4 duration-500 ${
+            criticalProductsAll.length > 0
+              ? "border-l-red-500 bg-red-50/20 dark:bg-red-950/10"
+              : "border-l-zinc-300 dark:border-l-zinc-700"
+          }`}
+          style={{ animationDelay: "225ms" }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardTitle className={`text-sm font-semibold ${
+              criticalProductsAll.length > 0
+                ? "text-red-600 dark:text-red-400"
+                : "text-zinc-500 dark:text-zinc-400"
+            }`}>
+              Risco de Ruptura
+            </CardTitle>
+            <div className={`p-2 rounded-lg shrink-0 group-hover:scale-110 transition-transform duration-200 ${
+              criticalProductsAll.length > 0
+                ? "bg-red-100 dark:bg-red-500/15"
+                : "bg-zinc-50 dark:bg-zinc-800"
+            }`}>
+              <AlertTriangle className={`h-4 w-4 ${
+                criticalProductsAll.length > 0
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-zinc-400 dark:text-zinc-500"
+              }`} />
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{servicesInPeriodCount}</div>
-            <p className="text-xs text-zinc-500 mt-1">Em serviço ou concluídos</p>
-          </CardContent>
-        </Card>
-
-        <Card className={`transition-all duration-300 hover:shadow-md border-l-4 ${criticalProductsAll.length > 0 ? 'border-l-red-500 bg-red-50/30 dark:bg-red-950/20' : 'border-l-zinc-300'}`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className={`text-sm font-medium ${criticalProductsAll.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-600 dark:text-zinc-400'}`}>Risco de Ruptura</CardTitle>
-            <AlertTriangle className={`h-4 w-4 ${criticalProductsAll.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-500 dark:text-zinc-400'}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${criticalProductsAll.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-zinc-900 dark:text-zinc-100'}`}>{criticalProductsAll.length} peças</div>
-            <p className={`text-xs mt-1 ${criticalProductsAll.length > 0 ? 'text-red-500 font-medium' : 'text-zinc-500 dark:text-zinc-400'}`}>
-              {criticalProductsAll.length > 0 ? 'Reposição urgente!' : 'Estoque regular'}
+          <CardContent className="pt-0">
+            <div className={`text-3xl font-black tabular-nums mb-2 ${
+              criticalProductsAll.length > 0
+                ? "text-red-600 dark:text-red-400"
+                : "text-zinc-900 dark:text-zinc-100"
+            }`}>
+              {criticalProductsAll.length}
+              <span className="text-base font-semibold ml-1.5 opacity-60">peças</span>
+            </div>
+            <p className={`text-xs font-semibold ${
+              criticalProductsAll.length > 0
+                ? "text-red-500 dark:text-red-400"
+                : "text-zinc-500 dark:text-zinc-400"
+            }`}>
+              {criticalProductsAll.length > 0 ? "Reposição urgente!" : "Estoque saudável"}
             </p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mt-4">
-        <Card className="col-span-4 transition-all duration-300 hover:shadow-md">
-          <CardHeader>
-            <CardTitle>Balanço Financeiro</CardTitle>
+      {/* ── CHARTS ─────────────────────────────────────────────────────────── */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mt-6 animate-in fade-in slide-in-from-bottom-2 duration-500 animation-delay-300">
+        <Card className="col-span-4 transition-all duration-300 hover:shadow-md dark:hover:shadow-zinc-800/50">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+              <CardTitle className="text-base font-bold">Balanço Financeiro</CardTitle>
+            </div>
             <CardDescription>Evolução de entradas e saídas no período selecionado.</CardDescription>
           </CardHeader>
           <CardContent className="pl-0">
@@ -454,9 +545,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </CardContent>
         </Card>
 
-        <Card className="col-span-3 transition-all duration-300 hover:shadow-md">
-          <CardHeader>
-            <CardTitle>Status do Pátio</CardTitle>
+        <Card className="col-span-3 transition-all duration-300 hover:shadow-md dark:hover:shadow-zinc-800/50">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+              <CardTitle className="text-base font-bold">Status do Pátio</CardTitle>
+            </div>
             <CardDescription>Volume de serviços no ciclo.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -465,103 +559,176 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mt-4 mb-8">
-        <Card className="col-span-4 transition-all duration-300 hover:shadow-md flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between border-b dark:border-zinc-800 pb-4">
+      {/* ── RECENT ORDERS + PAINEL DE COMPRAS ──────────────────────────────── */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mt-4 mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500 animation-delay-500">
+
+        {/* Recent Orders */}
+        <Card className="col-span-4 transition-all duration-300 hover:shadow-md dark:hover:shadow-zinc-800/50 flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between border-b dark:border-zinc-800 pb-4 shrink-0">
             <div>
-              <CardTitle>Últimas Modificações de OS</CardTitle>
+              <CardTitle className="font-bold">Últimas Modificações de OS</CardTitle>
               <CardDescription className="mt-1">Acompanhe a fila de serviços no salão.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Link href={`?${currentQuery.toString()}`}>
                 <Button variant="outline" size="sm" className="h-8 text-xs px-2 dark:border-zinc-700">
-                  {osOrderDirection === 'desc' ? <ArrowDown className="w-3 h-3 mr-1 text-blue-500"/> : <ArrowUp className="w-3 h-3 mr-1 text-blue-500"/>}
-                  {osOrderDirection === 'desc' ? "Mais Recentes" : "Mais Antigas"}
+                  {osOrderDirection === "desc"
+                    ? <ArrowDown className="w-3 h-3 mr-1 text-blue-500" />
+                    : <ArrowUp className="w-3 h-3 mr-1 text-blue-500" />}
+                  {osOrderDirection === "desc" ? "Mais Recentes" : "Mais Antigas"}
                 </Button>
               </Link>
               <Link href="/dashboard/os">
                 <Button variant="ghost" size="sm" className="h-8 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-950/30 px-2">
-                  Ver Todas <ExternalLink className="w-3 h-3 ml-1"/>
+                  Ver Todas <ExternalLink className="w-3 h-3 ml-1" />
                 </Button>
               </Link>
             </div>
           </CardHeader>
-          <CardContent className="pt-4 flex-1">
-            <div className="space-y-4">
-              {recentOrders.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-8 text-zinc-400">
-                  <FileText className="w-8 h-8 mb-2 opacity-50" />
-                  <p className="text-sm font-medium">Nenhuma ordem neste período.</p>
+          <CardContent className="pt-3 flex-1">
+            {recentOrders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-zinc-400">
+                <div className="rounded-full bg-zinc-100 dark:bg-zinc-800 p-4 mb-3">
+                  <FileText className="w-7 h-7 text-zinc-300 dark:text-zinc-600" />
                 </div>
-              )}
-              {recentOrders.map((os) => (
-                <div key={os.id} className="flex flex-col sm:flex-row sm:items-center justify-between group border-b border-zinc-100 dark:border-zinc-800 pb-4 last:border-0 last:pb-0 gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="bg-zinc-100 dark:bg-zinc-800/80 p-2 rounded-md shrink-0 flex flex-col items-center justify-center min-w-[56px] border dark:border-zinc-700/50">
-                      <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">OS</span>
-                      <span className="text-sm font-black text-zinc-900 dark:text-zinc-100">#{os.number}</span>
-                    </div>
-                    <div className="space-y-1.5">
-                      <p className="text-sm font-bold leading-none text-zinc-900 dark:text-zinc-100">
-                        {os.vehicle.brand} {os.vehicle.model} <span className="text-zinc-400 dark:text-zinc-500 font-normal">({os.vehicle.plate})</span>
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                        <span className="flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800/50 px-1.5 py-0.5 rounded-sm"><User className="w-3 h-3"/> {os.customer.name}</span>
-                        <span className="flex items-center gap-1 bg-zinc-50 dark:bg-zinc-800/50 px-1.5 py-0.5 rounded-sm"><CalendarClock className="w-3 h-3"/> {new Date(os.updatedAt).toLocaleDateString('pt-BR')}</span>
+                <p className="text-sm font-semibold text-zinc-500">Nenhuma ordem neste período.</p>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {recentOrders.map((os, idx) => (
+                  <div
+                    key={os.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between group border-b border-zinc-100 dark:border-zinc-800/80 pb-3 pt-2.5 last:border-0 last:pb-0 gap-3 rounded-xl -mx-2 px-2 hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-colors duration-150 animate-in fade-in slide-in-from-left-2 duration-300"
+                    style={{ animationDelay: `${idx * 55}ms` }}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* OS Number badge */}
+                      <div className="bg-zinc-100 dark:bg-zinc-800 p-1.5 rounded-lg shrink-0 flex flex-col items-center justify-center min-w-[50px] border border-zinc-200 dark:border-zinc-700">
+                        <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest leading-none">OS</span>
+                        <span className="text-sm font-black text-zinc-900 dark:text-zinc-100 leading-tight tabular-nums">
+                          #{os.number}
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 min-w-0">
+                        <p className="text-sm font-bold leading-tight text-zinc-900 dark:text-zinc-100 truncate">
+                          {os.vehicle.brand} {os.vehicle.model}{" "}
+                          <span className="text-zinc-400 dark:text-zinc-500 font-mono text-xs font-normal">
+                            ({os.vehicle.plate})
+                          </span>
+                        </p>
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                          <span className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 px-1.5 py-0.5 rounded-md">
+                            <User className="w-3 h-3 shrink-0" /> {os.customer.name}
+                          </span>
+                          <span className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800/80 px-1.5 py-0.5 rounded-md">
+                            <CalendarClock className="w-3 h-3 shrink-0" />
+                            {new Date(os.updatedAt).toLocaleDateString("pt-BR")}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex items-center sm:flex-col sm:items-end justify-between gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-                    <div className="font-bold text-sm text-zinc-900 dark:text-zinc-100 bg-zinc-50 dark:bg-zinc-800/50 px-2 py-1 rounded-md sm:bg-transparent sm:p-0">
-                      {formatBRL(os.total)}
+                    <div className="flex items-center sm:flex-col sm:items-end justify-between gap-2 w-full sm:w-auto shrink-0">
+                      <span className="font-black text-sm text-zinc-900 dark:text-zinc-100 tabular-nums">
+                        {formatBRL(os.total)}
+                      </span>
+                      {getStatusBadge(os.status)}
                     </div>
-                    {getStatusBadge(os.status)}
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card className={`col-span-3 transition-all duration-300 hover:shadow-md flex flex-col ${topCriticalProducts.length > 0 ? 'border-red-100 bg-red-50/10 dark:border-red-900/30 dark:bg-red-950/10' : ''}`}>
-          <CardHeader className="border-b dark:border-zinc-800 pb-4 flex flex-row items-center justify-between">
+        {/* Painel de Compras */}
+        <Card className={`col-span-3 transition-all duration-300 hover:shadow-md dark:hover:shadow-zinc-800/50 flex flex-col ${
+          topCriticalProducts.length > 0
+            ? "border-red-200 dark:border-red-900/40"
+            : ""
+        }`}>
+          <CardHeader className="border-b dark:border-zinc-800 pb-4 flex flex-row items-center justify-between shrink-0">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className={`w-5 h-5 ${topCriticalProducts.length > 0 ? 'text-red-500 dark:text-red-400' : 'text-zinc-400'}`} />
+              <CardTitle className="flex items-center gap-2 font-bold">
+                <AlertTriangle className={`w-4 h-4 ${
+                  topCriticalProducts.length > 0 ? "text-red-500 dark:text-red-400" : "text-zinc-400"
+                }`} />
                 Painel de Compras
               </CardTitle>
-              <CardDescription className="mt-1">Peças físicas com urgência.</CardDescription>
+              <CardDescription className="mt-1">Peças físicas com urgência de reposição.</CardDescription>
             </div>
             <Link href="/dashboard/estoque">
               <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30">
-                <ShoppingCart className="w-4 h-4"/>
+                <ShoppingCart className="w-4 h-4" />
               </Button>
             </Link>
           </CardHeader>
           <CardContent className="pt-4 flex-1">
-            <div className="space-y-4">
-              {topCriticalProducts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-emerald-500">
-                  <CheckCircle2 className="w-10 h-10 mb-3 opacity-80" />
-                  <p className="text-sm font-bold">O estoque físico está saudável!</p>
+            {topCriticalProducts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
+                <div className="rounded-full bg-emerald-50 dark:bg-emerald-950/30 p-4 mb-3 ring-1 ring-emerald-100 dark:ring-emerald-900/50">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-500 dark:text-emerald-400" />
                 </div>
-              ) : (
-                topCriticalProducts.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between group border-b border-zinc-100 dark:border-zinc-800 pb-3 last:border-0 last:pb-0">
-                    <div>
-                      <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate max-w-[160px] md:max-w-[200px]" title={p.name}>{p.name}</p>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Ref: {p.sku || 'S/N'}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase font-bold tracking-wider mb-1">Mín: {p.minStock}</p>
-                        <Badge variant="destructive" className="font-bold text-xs bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600">{p.stock} unid.</Badge>
+                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Estoque físico saudável!</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 text-center max-w-[180px]">
+                  Nenhuma peça abaixo do estoque mínimo.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {topCriticalProducts.map((p, idx) => {
+                  const pct = p.minStock > 0 ? Math.min(100, (p.stock / p.minStock) * 100) : 0;
+                  const isCritical = p.stock === 0;
+                  const barColor = isCritical
+                    ? "bg-red-600 dark:bg-red-500"
+                    : pct < 50
+                    ? "bg-orange-500"
+                    : "bg-yellow-500";
+                  return (
+                    <div
+                      key={p.id}
+                      className="animate-in fade-in slide-in-from-right-2 duration-300"
+                      style={{ animationDelay: `${idx * 50}ms` }}
+                    >
+                      <div className="flex items-start justify-between mb-1.5 gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate leading-tight"
+                            title={p.name}
+                          >
+                            {p.name}
+                          </p>
+                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">
+                            {p.sku || "S/N"}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <Badge
+                            variant="destructive"
+                            className={`font-black text-xs tabular-nums border-0 ${
+                              isCritical
+                                ? "bg-red-600 dark:bg-red-500 hover:bg-red-600"
+                                : "bg-orange-500 hover:bg-orange-500"
+                            }`}
+                          >
+                            {p.stock} un.
+                          </Badge>
+                          <p className="text-[10px] text-zinc-400 mt-0.5 text-right">
+                            mín: {p.minStock}
+                          </p>
+                        </div>
+                      </div>
+                      {/* Severity bar */}
+                      <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className={`h-1.5 rounded-full transition-all duration-700 ${barColor}`}
+                          style={{ width: `${pct}%`, transitionDelay: `${idx * 80}ms` }}
+                        />
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

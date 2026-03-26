@@ -607,7 +607,22 @@ function ProductTable({ products, isServiceTab, setQuickAdjust, setEditItem, for
           </TableHeader>
           <TableBody>
             {currentData.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center py-16 text-zinc-500 text-base">{emptyMsg}</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={6} className="py-0">
+                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-in fade-in zoom-in-95 duration-300">
+                    <div className="rounded-full bg-zinc-100 dark:bg-zinc-800/80 p-5 mb-4 ring-1 ring-zinc-200 dark:ring-zinc-700">
+                      {isServiceTab
+                        ? <Wrench className="w-10 h-10 text-zinc-300 dark:text-zinc-600" />
+                        : <Package className="w-10 h-10 text-zinc-300 dark:text-zinc-600" />
+                      }
+                    </div>
+                    <h3 className="font-bold text-zinc-700 dark:text-zinc-200 text-lg mb-1">{emptyMsg}</h3>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm leading-relaxed">
+                      Clique em &quot;Novo Item / Serviço&quot; para adicionar ao catálogo.
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
             )}
             {currentData.map((p: any) => {
               const profit = p.sellingPrice - p.costPrice;
@@ -704,7 +719,19 @@ function HistoryTable({ transactions, currentPage, setCurrentPage, itemsPerPage,
           </TableHeader>
           <TableBody>
             {currentData.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="text-center py-16 text-zinc-500 text-base">{emptyMsg}</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={5} className="py-0">
+                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-in fade-in zoom-in-95 duration-300">
+                    <div className="rounded-full bg-zinc-100 dark:bg-zinc-800/80 p-5 mb-4 ring-1 ring-zinc-200 dark:ring-zinc-700">
+                      <History className="w-10 h-10 text-zinc-300 dark:text-zinc-600" />
+                    </div>
+                    <h3 className="font-bold text-zinc-700 dark:text-zinc-200 text-lg mb-1">{emptyMsg}</h3>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-sm leading-relaxed">
+                      As movimentações de estoque ligadas a OS aparecem aqui automaticamente.
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
             )}
             {currentData.map((t: any) => (
               <TableRow key={t.id} className="dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
