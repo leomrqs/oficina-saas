@@ -1,7 +1,7 @@
 // app/dashboard/layout.tsx
 import { ReactNode } from "react";
 import Link from "next/link";
-import { Menu, Wrench, Target } from "lucide-react";
+import { Menu, Wrench, Target, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -11,6 +11,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { getActiveAnnouncements } from "@/actions/saas";
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const session = await getServerSession(authOptions);
@@ -30,10 +31,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   if (tenantId) {
     const tenantData = await prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { monthlyGoal: true, name: true }
+      select: { monthlyGoal: true, name: true, isActive: true }
     });
     
     if (tenantData) {
+      if (!tenantData.isActive && role !== "SUPER_ADMIN") {
+        redirect("/login");
+      }
       tenantName = tenantData.name;
       if (tenantData.monthlyGoal) targetGoal = tenantData.monthlyGoal;
     }
@@ -46,6 +50,16 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         _sum: { amount: true }
       });
       revCurrent = currentMonthIncome._sum.amount || 0;
+    }
+  }
+
+  // Fetch active announcements for non-SUPER_ADMIN users
+  let announcements: { id: string; title: string; body: string; type: string }[] = [];
+  if (role !== "SUPER_ADMIN") {
+    try {
+      announcements = await getActiveAnnouncements();
+    } catch {
+      // Silently fail if table doesn't exist yet
     }
   }
 
@@ -166,6 +180,23 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         </header>
 
         <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-zinc-50/30 dark:bg-zinc-950/50">
+          {announcements.length > 0 && announcements.slice(0, 2).map((a) => (
+            <div
+              key={a.id}
+              className={`flex items-start gap-3 px-4 py-3 rounded-lg text-sm ${
+                a.type === "critical"
+                  ? "bg-red-50 border border-red-200 text-red-700 dark:bg-red-950/20 dark:border-red-800 dark:text-red-400"
+                  : a.type === "warning"
+                  ? "bg-yellow-50 border border-yellow-200 text-yellow-700 dark:bg-yellow-950/20 dark:border-yellow-800 dark:text-yellow-400"
+                  : "bg-blue-50 border border-blue-200 text-blue-700 dark:bg-blue-950/20 dark:border-blue-800 dark:text-blue-400"
+              }`}
+            >
+              <Megaphone className="w-4 h-4 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold">{a.title}:</span> {a.body}
+              </div>
+            </div>
+          ))}
           {children}
         </main>
       </div>

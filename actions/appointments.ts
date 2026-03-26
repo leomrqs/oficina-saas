@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-export async function createAppointment(data: { customerId: string, vehicleId?: string, date: string, time: string, endTime?: string, notes?: string }) {
+export async function createAppointment(data: { customerId: string, vehicleId?: string, orderId?: string, date: string, time: string, endTime?: string, notes?: string }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.tenantId) throw new Error("Não autorizado");
 
@@ -14,12 +14,14 @@ export async function createAppointment(data: { customerId: string, vehicleId?: 
     data: {
       customerId: data.customerId,
       vehicleId: data.vehicleId || null,
+      orderId: data.orderId || null,
       date: new Date(`${data.date}T12:00:00Z`), // Força o meio-dia UTC para evitar bug de fuso
       time: data.time,
-      endTime: data.endTime || null, // NOVO: Salva a previsão de término
+      endTime: data.endTime || null,
       notes: data.notes,
       tenantId: session.user.tenantId,
-      status: "SCHEDULED"
+      // Se vinculou uma OS existente, nasce já como "OS Gerada"
+      status: data.orderId ? "COMPLETED" : "SCHEDULED",
     }
   });
 

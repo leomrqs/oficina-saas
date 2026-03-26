@@ -11,12 +11,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { createTransaction, markAsPaid, deleteTransaction, createFixedExpense, deleteFixedExpense, generateMonthlyFixedExpenses } from "@/actions/finance";
+import { createTransaction, markAsPaid, deleteTransaction, createFixedExpense, deleteFixedExpense, updateFixedExpense, generateMonthlyFixedExpenses } from "@/actions/finance";
+import { Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 export function ClientFinanceManager({ transactions, fixedExpenses, employees, tenantConfig }: { transactions: any[], fixedExpenses: any[], employees: any[], tenantConfig: any }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [openModal, setOpenModal] = useState<"INCOME" | "EXPENSE" | "FIXED" | null>(null);
+  const [editingFixed, setEditingFixed] = useState<any | null>(null);
+  const [editFixedForm, setEditFixedForm] = useState({ title: "", category: "", amount: "", dueDay: "" });
   const [payingTx, setPayingTx] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("PIX");
   
@@ -116,10 +119,19 @@ export function ClientFinanceManager({ transactions, fixedExpenses, employees, t
 
   const handleGenerateFixed = async () => {
     try {
-      const count = await generateMonthlyFixedExpenses();
-      if (count > 0) toast.success(`${count} contas fixas/salários lançados para este mês!`);
-      else toast.info("As contas deste mês já haviam sido lançadas.");
+      const count = await generateMonthlyFixedExpenses(currentDate.getMonth(), currentDate.getFullYear());
+      if (count > 0) toast.success(`${count} contas fixas/salários lançados para ${monthNames[currentDate.getMonth()]}!`);
+      else toast.info(`As contas de ${monthNames[currentDate.getMonth()]} já haviam sido lançadas.`);
     } catch { toast.error("Erro ao lançar contas."); }
+  };
+
+  const handleEditFixed = async (formData: FormData) => {
+    if (!editingFixed) return;
+    try {
+      await updateFixedExpense(editingFixed.id, formData);
+      toast.success("Conta fixa atualizada!");
+      setEditingFixed(null);
+    } catch { toast.error("Erro ao atualizar conta fixa."); }
   };
 
   const confirmPayment = async () => {
@@ -286,6 +298,54 @@ export function ClientFinanceManager({ transactions, fixedExpenses, employees, t
       </Dialog>
 
 
+      {/* MODAL DE EDIÇÃO DE CONTA FIXA */}
+      <Dialog open={!!editingFixed} onOpenChange={(open) => !open && setEditingFixed(null)}>
+        <DialogContent className="w-[95vw] max-w-xl bg-zinc-50 dark:bg-zinc-950 p-0 overflow-hidden border-zinc-200 dark:border-zinc-800 rounded-xl">
+          <div className="p-5 border-b dark:border-zinc-800 text-white bg-purple-600 dark:bg-purple-700">
+            <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+              <Pencil /> Editar Conta Fixa
+            </DialogTitle>
+          </div>
+          <form action={handleEditFixed} className="p-5 space-y-4 sm:space-y-6 max-h-[70vh] overflow-y-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+              <div className="col-span-1 sm:col-span-2 space-y-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Descrição</label>
+                <Input name="title" required defaultValue={editingFixed?.title} className="h-12 text-base dark:bg-zinc-900 dark:border-zinc-800" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Valor (R$)</label>
+                <Input name="amount" type="number" step="0.01" required defaultValue={editingFixed?.amount} className="h-12 font-bold text-lg sm:text-xl dark:bg-zinc-900 dark:border-zinc-800" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Categoria (DRE)</label>
+                <Select name="category" required defaultValue={editingFixed?.category}>
+                  <SelectTrigger className="h-12 dark:bg-zinc-900 dark:border-zinc-800"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent className="dark:bg-zinc-900 dark:border-zinc-800">
+                    {expenseCategories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-1 sm:col-span-2 space-y-2">
+                <label className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">Vence todo dia:</label>
+                <Select name="dueDay" required defaultValue={editingFixed?.dueDay?.toString()}>
+                  <SelectTrigger className="h-12 bg-purple-50 dark:bg-purple-950/30 border-purple-200 text-purple-900 font-bold"><SelectValue placeholder="Escolha o dia" /></SelectTrigger>
+                  <SelectContent className="max-h-56 dark:bg-zinc-900 dark:border-zinc-800">
+                    {Array.from({length: 31}, (_, i) => i + 1).map(d => <SelectItem key={d} value={d.toString()}>Todo dia {d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2">
+              Lançamentos passados não serão alterados. Apenas futuros gerados usarão o novo valor.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-end pt-4 border-t dark:border-zinc-800">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setEditingFixed(null)}>Cancelar</Button>
+              <Button type="submit" className="w-full sm:w-auto text-white bg-purple-600 hover:bg-purple-700">Salvar Alterações</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* ABAS DO SISTEMA (Scroll Horizontal no Mobile Aplicado) */}
       <Tabs defaultValue="dashboard" className="w-full" onValueChange={() => setCurrentPage(1)}>
         <div className="w-full overflow-x-auto hide-scrollbar mb-6 bg-zinc-200/50 dark:bg-zinc-800/50 rounded-lg p-1">
@@ -432,7 +492,10 @@ export function ClientFinanceManager({ transactions, fixedExpenses, employees, t
                       </TableCell>
                       <TableCell className="text-right font-bold text-red-600 dark:text-red-400 whitespace-nowrap">{formatBRL(f.amount)}</TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-red-600" onClick={async () => { if(confirm("Excluir?")) await deleteFixedExpense(f.id) }}><Trash2 className="w-4 h-4"/></Button>
+                        <div className="flex gap-0.5 justify-end">
+                          <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-purple-600" title="Editar" onClick={() => setEditingFixed(f)}><Pencil className="w-4 h-4"/></Button>
+                          <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-red-600" onClick={async () => { if(confirm("Excluir? Os lançamentos já realizados serão mantidos.")) await deleteFixedExpense(f.id) }}><Trash2 className="w-4 h-4"/></Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

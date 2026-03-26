@@ -2,11 +2,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Plus, Minus, ArrowUpRight, ArrowDownRight, Image as ImageIcon, Edit, FileEdit, Package, AlertTriangle, Wrench, Activity, DollarSign, ChevronLeft, ChevronRight, Hash, TrendingUp, Boxes, History } from "lucide-react";
+import { Search, Plus, Minus, ArrowUpRight, ArrowDownRight, Image as ImageIcon, Edit, FileEdit, Package, AlertTriangle, Wrench, Activity, DollarSign, ChevronLeft, ChevronRight, Hash, TrendingUp, Boxes, History, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -287,200 +287,293 @@ export function ClientInventory({ products, transactions }: { products: any[], t
         </TabsContent>
       </Tabs>
 
-      {/* MODAL: CRIAR PRODUTO / SERVIÇO */}
+      {/* ── MODAL: CRIAR PRODUTO / SERVIÇO ── */}
       <Dialog open={openModal} onOpenChange={(open) => { setOpenModal(open); if (!open) setIsCustomCategoryCreate(false); }}>
-        <DialogContent className="w-[95vw] max-w-2xl dark:bg-zinc-950 dark:border-zinc-800 p-0 overflow-hidden rounded-xl">
-          <div className="p-6 border-b dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50">
-            <DialogTitle className="dark:text-zinc-100 flex items-center gap-2 text-xl">
-              <Plus className="w-5 h-5 text-blue-500"/> Cadastro no Catálogo
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-xl">
+
+          {/* Header fixo */}
+          <div className="px-6 py-5 border-b dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0 shadow-sm flex items-center justify-between">
+            <DialogTitle className="text-xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+              <div className={`p-2 rounded-lg ${itemTypeToCreate === 'PRODUCT' ? 'bg-blue-100 dark:bg-blue-500/20' : 'bg-emerald-100 dark:bg-emerald-500/20'}`}>
+                {itemTypeToCreate === 'PRODUCT'
+                  ? <Package className={`w-5 h-5 ${itemTypeToCreate === 'PRODUCT' ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'}`} />
+                  : <Wrench className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                }
+              </div>
+              {itemTypeToCreate === 'PRODUCT' ? 'Nova Peça / Produto' : 'Novo Serviço (Mão de Obra)'}
             </DialogTitle>
+            <Button variant="ghost" size="icon" className="text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 shrink-0" onClick={() => setOpenModal(false)}>
+              <X className="w-5 h-5" />
+            </Button>
           </div>
-          
-          <form action={handleCreate} className="p-6 max-h-[75vh] overflow-y-auto">
-            {/* Escolha do Tipo de Item */}
-            <div className="flex bg-zinc-100 dark:bg-zinc-900 p-1 rounded-lg mb-6 w-full sm:w-fit mx-auto sm:mx-0">
-              <button type="button" onClick={() => setItemTypeToCreate("PRODUCT")} className={`flex-1 sm:flex-none px-6 py-2 text-sm font-bold rounded-md transition-colors ${itemTypeToCreate === 'PRODUCT' ? 'bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}>
-                📦 Peça Física
-              </button>
-              <button type="button" onClick={() => setItemTypeToCreate("SERVICE")} className={`flex-1 sm:flex-none px-6 py-2 text-sm font-bold rounded-md transition-colors ${itemTypeToCreate === 'SERVICE' ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}>
-                🛠️ Serviço (Mão de Obra)
-              </button>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-              <div className="col-span-1 sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Nome do {itemTypeToCreate === 'PRODUCT' ? 'Produto' : 'Serviço'} *</label>
-                <Input name="name" required placeholder={itemTypeToCreate === 'PRODUCT' ? "Ex: Pastilha de Freio Cobreq" : "Ex: Troca de Óleo + Filtros"} className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base" />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Código / SKU (Opcional)</label>
-                <Input name="sku" placeholder="Ex: COD-001" className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base" />
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Categoria *</label>
-                  <button type="button" onClick={() => setIsCustomCategoryCreate(!isCustomCategoryCreate)} className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                    {isCustomCategoryCreate ? "Usar Existente" : "+ Nova"}
-                  </button>
-                </div>
-                {isCustomCategoryCreate ? (
-                  <Input name="category" placeholder="Digite a nova categoria..." required autoFocus className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base" />
-                ) : (
-                  <Select name="category" defaultValue={itemTypeToCreate === 'PRODUCT' ? "Escapamentos" : "Mão de Obra"}>
-                    <SelectTrigger className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base"><SelectValue /></SelectTrigger>
-                    <SelectContent className="dark:bg-zinc-900 dark:border-zinc-800">
-                      {uniqueCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                )}
+          {/* Body com scroll */}
+          <div className="flex-1 overflow-y-auto p-4 md:p-6">
+            <form id="create-item-form" action={handleCreate} className="space-y-6">
+
+              {/* Tipo de Item */}
+              <div className="flex bg-zinc-100 dark:bg-zinc-900 p-1 rounded-lg w-full">
+                <button type="button" onClick={() => setItemTypeToCreate("PRODUCT")} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-md transition-colors ${itemTypeToCreate === 'PRODUCT' ? 'bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}>
+                  <Package className="w-4 h-4" /> Peça Física
+                </button>
+                <button type="button" onClick={() => setItemTypeToCreate("SERVICE")} className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-md transition-colors ${itemTypeToCreate === 'SERVICE' ? 'bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-300'}`}>
+                  <Wrench className="w-4 h-4" /> Serviço (Mão de Obra)
+                </button>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Custo / Despesa (R$)</label>
-                <Input name="costPrice" type="number" step="0.01" defaultValue="0" required className="h-12 dark:bg-zinc-900 dark:border-zinc-800 font-bold text-lg text-red-600 dark:text-red-400" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Preço de Venda (R$)</label>
-                <Input name="sellingPrice" type="number" step="0.01" defaultValue="0" required className="h-12 dark:bg-zinc-900 dark:border-zinc-800 font-bold text-lg text-emerald-600 dark:text-emerald-400" />
-              </div>
-
-              {/* Só exibe campos de estoque se for PRODUTO FÍSICO */}
-              {itemTypeToCreate === "PRODUCT" && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Estoque Inicial (Gaveta)</label>
-                    <Input name="initialStock" type="number" defaultValue="0" required className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base" />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Alerta Mínimo (Ruptura)</label>
-                    <Input name="minStock" type="number" defaultValue="2" required className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base" />
-                  </div>
+              {/* Bloco: Identificação */}
+              <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl p-5 space-y-4 shadow-sm">
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider border-b dark:border-zinc-800 pb-2">Identificação</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="col-span-1 sm:col-span-2 space-y-2">
-                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Localização / Prateleira (Opcional)</label>
-                    <Input name="location" placeholder="Ex: Corredor A, Gaveta 3" className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base" />
+                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Nome do {itemTypeToCreate === 'PRODUCT' ? 'Produto' : 'Serviço'} *</label>
+                    <Input name="name" required placeholder={itemTypeToCreate === 'PRODUCT' ? "Ex: Pastilha de Freio Cobreq" : "Ex: Troca de Óleo + Filtros"} className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700" />
                   </div>
-                </>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Código / SKU <span className="normal-case font-normal text-zinc-400">(Opcional)</span></label>
+                    <Input name="sku" placeholder="Ex: COD-001" className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Categoria *</label>
+                      <button type="button" onClick={() => setIsCustomCategoryCreate(!isCustomCategoryCreate)} className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                        {isCustomCategoryCreate ? "← Usar existente" : "+ Criar nova"}
+                      </button>
+                    </div>
+                    {isCustomCategoryCreate ? (
+                      <Input name="category" placeholder="Digite a nova categoria..." required autoFocus className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700" />
+                    ) : (
+                      <Select name="category" defaultValue={itemTypeToCreate === 'PRODUCT' ? "Escapamentos" : "Mão de Obra"}>
+                        <SelectTrigger className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700"><SelectValue /></SelectTrigger>
+                        <SelectContent className="dark:bg-zinc-900 dark:border-zinc-800">
+                          {uniqueCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloco: Preços */}
+              <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl p-5 space-y-4 shadow-sm">
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider border-b dark:border-zinc-800 pb-2">Precificação</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-red-500 dark:text-red-400 uppercase tracking-wider">Custo (R$)</label>
+                    <Input name="costPrice" type="number" step="0.01" defaultValue="0" required className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700 font-bold text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Venda (R$)</label>
+                    <Input name="sellingPrice" type="number" step="0.01" defaultValue="0" required className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700 font-bold text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloco: Estoque (só para peça física) */}
+              {itemTypeToCreate === "PRODUCT" && (
+                <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl p-5 space-y-4 shadow-sm">
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider border-b dark:border-zinc-800 pb-2">Estoque</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Qtd. Inicial</label>
+                      <Input name="initialStock" type="number" defaultValue="0" required className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700 font-bold text-center text-lg" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Alerta Mínimo</label>
+                      <Input name="minStock" type="number" defaultValue="2" required className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700 font-bold text-center text-lg" />
+                    </div>
+                    <div className="col-span-2 space-y-2">
+                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Localização / Prateleira <span className="normal-case font-normal text-zinc-400">(Opcional)</span></label>
+                      <Input name="location" placeholder="Ex: Corredor A, Gaveta 3" className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700" />
+                    </div>
+                  </div>
+                </div>
               )}
 
-              <div className="col-span-1 sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">URL da Foto (Opcional)</label>
-                <Input name="imageUrl" placeholder="https://exemplo.com/foto.jpg" className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base" />
+              {/* Foto */}
+              <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5" /> URL da Foto <span className="normal-case font-normal text-zinc-400">(Opcional)</span>
+                  </label>
+                  <Input name="imageUrl" placeholder="https://exemplo.com/foto.jpg" className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700" />
+                </div>
               </div>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-3 justify-end pt-6 mt-6 border-t dark:border-zinc-800">
-              <Button type="button" variant="outline" className="w-full sm:w-auto h-12" onClick={() => setOpenModal(false)}>Cancelar</Button>
-              <Button type="submit" className={`w-full sm:w-auto h-12 text-white font-bold text-base shadow-md ${itemTypeToCreate === 'PRODUCT' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
-                Cadastrar no Catálogo
-              </Button>
-            </div>
-          </form>
+
+            </form>
+          </div>
+
+          {/* Footer fixo */}
+          <div className="px-6 py-4 border-t dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0 flex flex-col sm:flex-row gap-3 justify-end">
+            <Button type="button" variant="outline" className="w-full sm:w-auto h-11 dark:border-zinc-700" onClick={() => setOpenModal(false)}>Cancelar</Button>
+            <Button type="submit" form="create-item-form" className={`w-full sm:w-auto h-11 font-bold text-white shadow-sm hover:-translate-y-0.5 transition-all ${itemTypeToCreate === 'PRODUCT' ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+              Cadastrar no Catálogo
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
-      {/* MODAL: AJUSTE RÁPIDO DE ESTOQUE */}
+      {/* ── MODAL: AJUSTE RÁPIDO DE ESTOQUE ── */}
       <Dialog open={!!quickAdjust} onOpenChange={(open) => !open && setQuickAdjust(null)}>
-        <DialogContent className="w-[90vw] max-w-md dark:bg-zinc-950 dark:border-zinc-800 rounded-xl p-0 overflow-hidden">
-          <div className={`p-5 border-b dark:border-zinc-800 text-white ${quickAdjust?.type === 'IN' ? 'bg-emerald-600' : 'bg-orange-600'}`}>
+        <DialogContent className="w-[95vw] sm:max-w-md max-h-[90vh] flex flex-col p-0 overflow-hidden bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-xl">
+
+          {/* Header colorido fixo */}
+          <div className={`px-6 py-5 border-b dark:border-zinc-800 shrink-0 flex items-center justify-between text-white ${quickAdjust?.type === 'IN' ? 'bg-emerald-600' : 'bg-orange-600'}`}>
             <DialogTitle className="flex items-center gap-2 text-xl font-bold">
               {quickAdjust?.type === "IN" ? <ArrowUpRight className="w-6 h-6" /> : <ArrowDownRight className="w-6 h-6" />}
               {quickAdjust?.type === "IN" ? "Entrada no Estoque" : "Saída do Estoque"}
             </DialogTitle>
+            <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10 shrink-0" onClick={() => setQuickAdjust(null)}>
+              <X className="w-5 h-5" />
+            </Button>
           </div>
-          <form action={handleAdjust} className="p-6 space-y-5">
-            <input type="hidden" name="productId" value={quickAdjust?.product.id} />
-            <input type="hidden" name="type" value={quickAdjust?.type} />
-            
-            <div className="bg-zinc-50 dark:bg-zinc-900 p-4 rounded-lg border dark:border-zinc-800 text-sm text-center">
-              <span className="text-xs uppercase font-bold text-zinc-500">Peça selecionada</span><br/>
-              <span className="font-black text-zinc-900 dark:text-zinc-100 text-lg">{quickAdjust?.product.name}</span>
-            </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Quantidade ({quickAdjust?.type === "IN" ? "+" : "-"})</label>
-              <Input name="quantity" type="number" min="1" required autoFocus className="h-16 font-black text-3xl text-center dark:bg-zinc-900 dark:border-zinc-800" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Motivo / Log (Obrigatório)</label>
-              <Input name="reason" placeholder={quickAdjust?.type === "IN" ? "Ex: Compra NF 1234, Devolução..." : "Ex: Peça com defeito, Uso interno, Quebra..."} required className="h-12 text-base dark:bg-zinc-900 dark:border-zinc-800" />
-              <p className="text-[11px] text-zinc-500 mt-1">Se a saída for para uma OS, use a tela do Pátio que a baixa é automática.</p>
-            </div>
-            <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" className="w-full h-12" onClick={() => setQuickAdjust(null)}>Cancelar</Button>
-              <Button type="submit" className={`w-full h-12 text-base font-bold text-white ${quickAdjust?.type === "IN" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-orange-600 hover:bg-orange-700"}`}>Confirmar Operação</Button>
-            </div>
-          </form>
+          {/* Body scroll */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <form id="adjust-form" action={handleAdjust} className="space-y-5">
+              <input type="hidden" name="productId" value={quickAdjust?.product.id} />
+              <input type="hidden" name="type" value={quickAdjust?.type} />
+
+              {/* Peça selecionada */}
+              <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl p-4 text-center shadow-sm">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Peça selecionada</p>
+                <p className="font-black text-zinc-900 dark:text-zinc-100 text-lg leading-tight">{quickAdjust?.product.name}</p>
+                {quickAdjust?.product.sku && <p className="text-xs font-mono text-zinc-500 mt-1">{quickAdjust.product.sku}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
+                  Quantidade ({quickAdjust?.type === "IN" ? "+" : "-"}) *
+                </label>
+                <Input name="quantity" type="number" min="1" required autoFocus className="h-16 font-black text-3xl text-center bg-white dark:bg-zinc-900 dark:border-zinc-700" />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Motivo / Log *</label>
+                <Input
+                  name="reason"
+                  placeholder={quickAdjust?.type === "IN" ? "Ex: Compra NF 1234, Devolução..." : "Ex: Peça com defeito, Uso interno..."}
+                  required
+                  className="h-11 bg-white dark:bg-zinc-900 dark:border-zinc-700"
+                />
+                <p className="text-[11px] text-zinc-400 dark:text-zinc-500">Saída para OS? Use o Pátio — a baixa é automática.</p>
+              </div>
+            </form>
+          </div>
+
+          {/* Footer fixo */}
+          <div className="px-6 py-4 border-t dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0 flex gap-3">
+            <Button type="button" variant="outline" className="flex-1 h-11 dark:border-zinc-700" onClick={() => setQuickAdjust(null)}>Cancelar</Button>
+            <Button type="submit" form="adjust-form" className={`flex-1 h-11 font-bold text-white shadow-sm hover:-translate-y-0.5 transition-all ${quickAdjust?.type === "IN" ? "bg-emerald-600 hover:bg-emerald-500" : "bg-orange-600 hover:bg-orange-500"}`}>
+              Confirmar Operação
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
-      {/* MODAL: EDITAR ITEM */}
+      {/* ── MODAL: EDITAR ITEM ── */}
       <Dialog open={!!editItem} onOpenChange={(open) => { if (!open) { setEditItem(null); setIsCustomCategoryEdit(false); }}}>
-        <DialogContent className="w-[95vw] max-w-2xl dark:bg-zinc-950 dark:border-zinc-800 p-0 overflow-hidden rounded-xl">
-          <div className="p-6 border-b dark:border-zinc-800 flex justify-between items-center bg-zinc-50 dark:bg-zinc-900/50">
-            <DialogTitle className="dark:text-zinc-100 flex items-center gap-2 text-xl"><FileEdit className="w-5 h-5 text-blue-500"/> Editar Dados do Catálogo</DialogTitle>
+        <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-xl">
+
+          {/* Header fixo */}
+          <div className="px-6 py-5 border-b dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0 shadow-sm flex items-center justify-between">
+            <DialogTitle className="text-xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+              <div className="bg-blue-100 dark:bg-blue-500/20 p-2 rounded-lg">
+                <FileEdit className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              Editar {editItem?.isService ? 'Serviço' : 'Peça'}
+            </DialogTitle>
+            <Button variant="ghost" size="icon" className="text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 shrink-0" onClick={() => { setEditItem(null); setIsCustomCategoryEdit(false); }}>
+              <X className="w-5 h-5" />
+            </Button>
           </div>
+
+          {/* Body com scroll */}
           {editItem && (
-            <form action={handleUpdate} className="p-6 max-h-[75vh] overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-              <input type="hidden" name="id" value={editItem.id} />
-              <input type="hidden" name="isService" value={editItem.isService ? "true" : "false"} />
-              
-              <div className="col-span-1 sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Nome</label>
-                <Input name="name" defaultValue={editItem.name} required className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Código (SKU)</label>
-                <Input name="sku" defaultValue={editItem.sku || ""} className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base" />
-              </div>
+            <div className="flex-1 overflow-y-auto p-4 md:p-6">
+              <form id="edit-item-form" action={handleUpdate} className="space-y-6">
+                <input type="hidden" name="id" value={editItem.id} />
+                <input type="hidden" name="isService" value={editItem.isService ? "true" : "false"} />
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Categoria</label>
-                  <button type="button" onClick={() => setIsCustomCategoryEdit(!isCustomCategoryEdit)} className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                    {isCustomCategoryEdit ? "Usar Existente" : "+ Nova"}
-                  </button>
+                {/* Identificação */}
+                <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl p-5 space-y-4 shadow-sm">
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider border-b dark:border-zinc-800 pb-2">Identificação</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="col-span-1 sm:col-span-2 space-y-2">
+                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Nome *</label>
+                      <Input name="name" defaultValue={editItem.name} required className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Código / SKU</label>
+                      <Input name="sku" defaultValue={editItem.sku || ""} className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700" />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Categoria</label>
+                        <button type="button" onClick={() => setIsCustomCategoryEdit(!isCustomCategoryEdit)} className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                          {isCustomCategoryEdit ? "← Usar existente" : "+ Criar nova"}
+                        </button>
+                      </div>
+                      {isCustomCategoryEdit ? (
+                        <Input name="category" placeholder="Nova categoria..." required autoFocus className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700" />
+                      ) : (
+                        <Select name="category" defaultValue={editItem.category}>
+                          <SelectTrigger className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700"><SelectValue /></SelectTrigger>
+                          <SelectContent className="dark:bg-zinc-900 dark:border-zinc-800">
+                            {uniqueCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                {isCustomCategoryEdit ? (
-                  <Input name="category" placeholder="Nova categoria..." required autoFocus className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base" />
-                ) : (
-                  <Select name="category" defaultValue={editItem.category}>
-                    <SelectTrigger className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base"><SelectValue /></SelectTrigger>
-                    <SelectContent className="dark:bg-zinc-900 dark:border-zinc-800">
-                      {uniqueCategories.map(cat => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+
+                {/* Precificação */}
+                <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl p-5 space-y-4 shadow-sm">
+                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-wider border-b dark:border-zinc-800 pb-2">Precificação</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-red-500 dark:text-red-400 uppercase tracking-wider">Custo (R$)</label>
+                      <Input name="costPrice" type="number" step="0.01" defaultValue={editItem.costPrice} required className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700 font-bold text-red-600 dark:text-red-400" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Venda (R$)</label>
+                      <Input name="sellingPrice" type="number" step="0.01" defaultValue={editItem.sellingPrice} required className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700 font-bold text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Estoque mínimo (só peça física) */}
+                {!editItem.isService && (
+                  <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Alerta de Estoque Mínimo</label>
+                      <Input name="minStock" type="number" defaultValue={editItem.minStock} required className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700 font-bold text-center text-lg" />
+                    </div>
+                  </div>
                 )}
-              </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider">Preço de Custo (R$)</label>
-                <Input name="costPrice" type="number" step="0.01" defaultValue={editItem.costPrice} required className="h-12 text-lg font-bold dark:bg-zinc-900 dark:border-zinc-800" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Preço de Venda (R$)</label>
-                <Input name="sellingPrice" type="number" step="0.01" defaultValue={editItem.sellingPrice} required className="h-12 text-lg font-bold dark:bg-zinc-900 dark:border-zinc-800" />
-              </div>
-
-              {!editItem.isService && (
-                <div className="col-span-1 sm:col-span-2 space-y-2">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Alerta de Estoque Mínimo</label>
-                  <Input name="minStock" type="number" defaultValue={editItem.minStock} required className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base" />
+                {/* Foto */}
+                <div className="bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5" /> URL da Foto <span className="normal-case font-normal text-zinc-400">(Opcional)</span>
+                    </label>
+                    <Input name="imageUrl" defaultValue={editItem.imageUrl || ""} className="h-11 bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-700" />
+                  </div>
                 </div>
-              )}
 
-              <div className="col-span-1 sm:col-span-2 space-y-2">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">URL da Foto</label>
-                <Input name="imageUrl" defaultValue={editItem.imageUrl || ""} className="h-12 dark:bg-zinc-900 dark:border-zinc-800 text-base" />
-              </div>
-
-              <div className="col-span-1 sm:col-span-2 flex flex-col sm:flex-row gap-3 justify-end pt-6 mt-4 border-t dark:border-zinc-800">
-                <Button type="button" variant="outline" className="w-full sm:w-auto h-12" onClick={() => setEditItem(null)}>Cancelar</Button>
-                <Button type="submit" className="w-full sm:w-auto h-12 text-base font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md">Salvar Alterações</Button>
-              </div>
-            </form>
+              </form>
+            </div>
           )}
+
+          {/* Footer fixo */}
+          <div className="px-6 py-4 border-t dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0 flex flex-col sm:flex-row gap-3 justify-end">
+            <Button type="button" variant="outline" className="w-full sm:w-auto h-11 dark:border-zinc-700" onClick={() => { setEditItem(null); setIsCustomCategoryEdit(false); }}>Cancelar</Button>
+            <Button type="submit" form="edit-item-form" className="w-full sm:w-auto h-11 font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-sm hover:-translate-y-0.5 transition-all">
+              Salvar Alterações
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

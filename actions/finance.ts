@@ -75,6 +75,22 @@ export async function createFixedExpense(formData: FormData) {
   revalidatePath("/dashboard/financeiro");
 }
 
+export async function updateFixedExpense(id: string, formData: FormData) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.tenantId) throw new Error("Não autorizado");
+
+  await prisma.fixedExpense.update({
+    where: { id, tenantId: session.user.tenantId },
+    data: {
+      title: formData.get("title") as string,
+      category: formData.get("category") as string,
+      amount: parseFloat(formData.get("amount") as string),
+      dueDay: parseInt(formData.get("dueDay") as string),
+    },
+  });
+  revalidatePath("/dashboard/financeiro");
+}
+
 export async function deleteFixedExpense(id: string) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.tenantId) throw new Error("Não autorizado");
@@ -85,23 +101,23 @@ export async function deleteFixedExpense(id: string) {
   revalidatePath("/dashboard/financeiro");
 }
 
-export async function generateMonthlyFixedExpenses() {
+export async function generateMonthlyFixedExpenses(targetMonth?: number, targetYear?: number) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.tenantId) throw new Error("Não autorizado");
 
   const tenantId = session.user.tenantId;
-  
+
   // Busca Contas Fixas Manuais
   const fixedExpenses = await prisma.fixedExpense.findMany({ where: { tenantId } });
-  
+
   // Busca Salários do RH
   const employees = await prisma.employee.findMany({
     where: { tenantId, isActive: true, salary: { not: null }, payDay: { not: null } }
   });
-  
+
   const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
+  const currentMonth = targetMonth !== undefined ? targetMonth : now.getMonth();
+  const currentYear = targetYear !== undefined ? targetYear : now.getFullYear();
   let createdCount = 0;
 
   // Lança Contas Fixas

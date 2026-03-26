@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Users, Package, FileText, DollarSign, Settings, Building, HardHat, LayoutGrid, Loader2, CalendarDays } from "lucide-react";
+import { LayoutDashboard, Users, Package, FileText, DollarSign, Settings, Building, HardHat, LayoutGrid, Loader2, CalendarDays, Megaphone, ScrollText, ShieldCheck } from "lucide-react";
 
 // MENU DO DONO/GERENTE (Acesso Total)
 const managerItems = [
@@ -33,6 +33,9 @@ const superAdminItems = [
   { name: "Visão Geral SaaS", href: "/dashboard", icon: LayoutDashboard },
   { name: "Gestão de Oficinas", href: "/dashboard/oficinas", icon: Building },
   { name: "Faturamento SaaS", href: "/dashboard/faturamento", icon: DollarSign },
+  { name: "Comunicados", href: "/dashboard/comunicados", icon: Megaphone },
+  { name: "Logs de Auditoria", href: "/dashboard/logs", icon: ScrollText },
+  { name: "Meu Perfil", href: "/dashboard/perfil", icon: ShieldCheck },
 ];
 
 export function Sidebar({ role }: { role?: string }) {

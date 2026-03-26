@@ -8,7 +8,9 @@ import { DollarSign, FileText, Wrench, AlertTriangle, Building, ArrowUpRight, Ar
 import { Badge } from "@/components/ui/badge";
 import { FinancialChart, OSStatusChart } from "./DashboardCharts";
 import { Button } from "@/components/ui/button";
-import { DashboardFilter } from "./DashboardFilter"; 
+import { DashboardFilter } from "./DashboardFilter";
+import { PlanDonutChart, TenantGrowthChart } from "./SaasDashboardCharts";
+import { TenantStatusToggle } from "./TenantStatusToggle";
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ from?: string, to?: string, osOrder?: string }> }) {
   const session = await getServerSession(authOptions);
@@ -16,12 +18,207 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const tenantId = session?.user?.tenantId;
 
   if (isSuperAdmin || !tenantId) {
+    const now = new Date();
+    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+
+    const [allTenants, totalOrders, newThisMonth, newLastMonth] = await Promise.all([
+      prisma.tenant.findMany({
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true, name: true, cnpj: true, isActive: true,
+          saasPlan: true, saasPrice: true, createdAt: true,
+        },
+      }),
+      prisma.order.count(),
+      prisma.tenant.count({ where: { createdAt: { gte: startOfThisMonth } } }),
+      prisma.tenant.count({ where: { createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
+    ]);
+
+    const activeTenants = allTenants.filter((t) => t.isActive);
+    const blockedTenants = allTenants.filter((t) => !t.isActive);
+    const mrr = activeTenants.reduce((sum, t) => sum + t.saasPrice, 0);
+    const arr = mrr * 12;
+
+    // Plan distribution
+    const planMap = new Map<string, { count: number; revenue: number }>();
+    activeTenants.forEach((t) => {
+      const cur = planMap.get(t.saasPlan) ?? { count: 0, revenue: 0 };
+      planMap.set(t.saasPlan, { count: cur.count + 1, revenue: cur.revenue + t.saasPrice });
+    });
+    const planData = Array.from(planMap.entries()).map(([name, v]) => ({ name, ...v }));
+
+    // Last 6 months growth
+    const growthData: { name: string; oficinas: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+      const count = await prisma.tenant.count({ where: { createdAt: { gte: d, lte: end } } });
+      const label = d.toLocaleString("pt-BR", { month: "short" });
+      growthData.push({ name: label.charAt(0).toUpperCase() + label.slice(1), oficinas: count });
+    }
+
+    const growthDiff = newThisMonth - newLastMonth;
+    const formatBRLSaaS = (val: number) =>
+      new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+
     return (
-      <div className="space-y-4">
-        <h2 className="text-3xl font-bold tracking-tight">Painel Administrativo SaaS</h2>
-        <Card className="bg-zinc-900 text-white transition-all duration-300 hover:shadow-md">
-          <CardHeader><CardTitle className="flex items-center gap-2"><Building className="h-5 w-5" /> Visão Global do Sistema</CardTitle></CardHeader>
-          <CardContent><p className="text-zinc-400">Este painel será desenvolvido futuramente.</p></CardContent>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Painel SaaS</h2>
+            <p className="text-zinc-500 text-sm mt-1">Visão consolidada de todas as oficinas.</p>
+          </div>
+          <Link href="/dashboard/oficinas">
+            <Button size="sm" className="gap-2">
+              <Building className="w-4 h-4" />
+              Gerenciar Oficinas
+            </Button>
+          </Link>
+        </div>
+
+        {/* KPI Cards */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <Card className="border-l-4 border-l-emerald-500">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">MRR</CardTitle>
+              <DollarSign className="h-4 w-4 text-emerald-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatBRLSaaS(mrr)}</div>
+              <p className="text-xs text-zinc-500 mt-1">Receita mensal recorrente</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-blue-500">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">ARR Projetado</CardTitle>
+              <DollarSign className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatBRLSaaS(arr)}</div>
+              <p className="text-xs text-zinc-500 mt-1">MRR × 12 meses</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-violet-500">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Oficinas Ativas</CardTitle>
+              <Building className="h-4 w-4 text-violet-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{activeTenants.length}</div>
+              <p className="text-xs text-zinc-500 mt-1">de {allTenants.length} cadastradas</p>
+            </CardContent>
+          </Card>
+
+          <Card className={`border-l-4 ${blockedTenants.length > 0 ? "border-l-red-500" : "border-l-zinc-300"}`}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Bloqueadas</CardTitle>
+              <AlertTriangle className={`h-4 w-4 ${blockedTenants.length > 0 ? "text-red-500" : "text-zinc-400"}`} />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${blockedTenants.length > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                {blockedTenants.length}
+              </div>
+              <p className="text-xs text-zinc-500 mt-1">
+                {blockedTenants.length > 0 ? "Requerem atenção" : "Todas regulares"}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-l-4 border-l-orange-400">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Crescimento</CardTitle>
+              <ArrowUpRight className="h-4 w-4 text-orange-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{newThisMonth}</div>
+              <p className={`text-xs mt-1 font-medium flex items-center gap-1 ${growthDiff >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                {growthDiff >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                {Math.abs(growthDiff)} vs mês anterior
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Charts row */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Distribuição por Plano</CardTitle>
+              <CardDescription>Oficinas ativas por tipo de contrato.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PlanDonutChart data={planData} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Crescimento Mensal</CardTitle>
+              <CardDescription>Novas oficinas cadastradas nos últimos 6 meses.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TenantGrowthChart data={growthData} />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Tenants with quick actions */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between border-b dark:border-zinc-800 pb-4">
+            <div>
+              <CardTitle>Oficinas Recentes</CardTitle>
+              <CardDescription className="mt-1">Últimas cadastradas — ações rápidas disponíveis.</CardDescription>
+            </div>
+            <Link href="/dashboard/oficinas">
+              <Button variant="ghost" size="sm" className="text-xs text-blue-600 dark:text-blue-400">
+                Ver todas <ExternalLink className="w-3 h-3 ml-1" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="divide-y dark:divide-zinc-800">
+              {allTenants.slice(0, 8).map((t) => (
+                <div key={t.id} className="flex items-center justify-between py-3 gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded-md shrink-0">
+                      <Building className="w-4 h-4 text-zinc-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate text-zinc-900 dark:text-zinc-100">{t.name}</p>
+                      <p className="text-xs text-zinc-500">{t.cnpj || "CNPJ não informado"}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs text-zinc-500 hidden sm:block">
+                      {new Date(t.createdAt).toLocaleDateString("pt-BR")}
+                    </span>
+                    <Badge variant="outline" className="text-xs hidden md:inline-flex">{t.saasPlan}</Badge>
+                    <Badge
+                      variant="outline"
+                      className={
+                        t.isActive
+                          ? "text-emerald-600 border-emerald-200 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500/20 text-xs"
+                          : "text-red-600 border-red-200 bg-red-50 dark:bg-red-500/10 dark:border-red-500/20 text-xs"
+                      }
+                    >
+                      {t.isActive ? "Ativa" : "Bloqueada"}
+                    </Badge>
+                    <TenantStatusToggle tenantId={t.id} isActive={t.isActive} />
+                  </div>
+                </div>
+              ))}
+              {allTenants.length === 0 && (
+                <div className="py-10 text-center text-zinc-400 text-sm">
+                  Nenhuma oficina cadastrada ainda.
+                </div>
+              )}
+            </div>
+          </CardContent>
         </Card>
       </div>
     );

@@ -23,7 +23,7 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-export function ClientAppointmentManager({ appointments, customers }: { appointments: any[], customers: any[] }) {
+export function ClientAppointmentManager({ appointments, customers, unlinkedOrders }: { appointments: any[], customers: any[], unlinkedOrders: any[] }) {
   
   // Formatador de data local seguro contra fuso horário
   const formatLocal = (d: Date) => {
@@ -59,12 +59,21 @@ export function ClientAppointmentManager({ appointments, customers }: { appointm
   // Form State
   const [formDate, setFormDate] = useState(formatLocal(new Date()));
   const [formTime, setFormTime] = useState("09:00");
-  const [formEndTime, setFormEndTime] = useState(""); // NOVO: Estado de Tempo Estimado
+  const [formEndTime, setFormEndTime] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [selectedVehicle, setSelectedVehicle] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState("");
   const [notes, setNotes] = useState("");
 
   const customerVehicles = useMemo(() => customers.find(c => c.id === selectedCustomer)?.vehicles || [], [selectedCustomer, customers]);
+
+  // OS disponíveis para o cliente selecionado (sem agendamento ainda)
+  const availableOrders = useMemo(() =>
+    selectedCustomer
+      ? unlinkedOrders.filter(o => o.customerId === selectedCustomer)
+      : unlinkedOrders,
+    [selectedCustomer, unlinkedOrders]
+  );
 
   // NOVO: Alerta de Choque de Horário (Real-time Overbooking Detection)
   const conflictingAppointment = useMemo(() => {
@@ -134,12 +143,32 @@ export function ClientAppointmentManager({ appointments, customers }: { appointm
     if (!selectedCustomer || !formDate || !formTime) return toast.error("Preencha cliente, data e hora inicial.");
     try {
       setIsSubmitting(true);
-      await createAppointment({ customerId: selectedCustomer, vehicleId: selectedVehicle, date: formDate, time: formTime, endTime: formEndTime, notes });
-      toast.success("Agendamento criado!");
+      await createAppointment({
+        customerId: selectedCustomer,
+        vehicleId: selectedVehicle || undefined,
+        orderId: selectedOrder || undefined,
+        date: formDate,
+        time: formTime,
+        endTime: formEndTime || undefined,
+        notes,
+      });
+      toast.success(selectedOrder ? "Agendamento criado e OS vinculada!" : "Agendamento criado!");
       setOpenNewModal(false);
-      setSelectedCustomer(""); setSelectedVehicle(""); setNotes(""); setFormEndTime("");
+      setSelectedCustomer(""); setSelectedVehicle(""); setSelectedOrder(""); setNotes(""); setFormEndTime("");
     } catch { toast.error("Erro ao agendar."); }
     finally { setIsSubmitting(false); }
+  };
+
+  // Ao selecionar uma OS, auto-preenche o veículo
+  const handleSelectOrder = (orderId: string) => {
+    setSelectedOrder(orderId);
+    if (orderId) {
+      const order = unlinkedOrders.find(o => o.id === orderId);
+      if (order?.vehicle) {
+        const vehicle = customerVehicles.find((v: any) => v.plate === order.vehicle.plate);
+        if (vehicle) setSelectedVehicle(vehicle.id);
+      }
+    }
   };
 
   const handleStatus = async (id: string, status: any) => {
@@ -390,6 +419,42 @@ export function ClientAppointmentManager({ appointments, customers }: { appointm
                   {customerVehicles.map((v: any) => <SelectItem key={v.id} value={v.id}>{v.plate} - {v.brand} {v.model}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Vincular OS existente */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-zinc-500 uppercase flex items-center justify-between">
+                Vincular OS Existente
+                <span className="text-[9px] text-zinc-400 normal-case font-normal">Opcional — vincula uma OS já criada</span>
+              </label>
+              <Select
+                onValueChange={handleSelectOrder}
+                value={selectedOrder}
+                disabled={!selectedCustomer}
+              >
+                <SelectTrigger className="h-12 text-base dark:bg-zinc-900 dark:border-zinc-800">
+                  <SelectValue placeholder={
+                    !selectedCustomer
+                      ? "Selecione um cliente primeiro"
+                      : availableOrders.length === 0
+                        ? "Nenhuma OS disponível para este cliente"
+                        : "Sem vínculo de OS (criar agendamento puro)"
+                  } />
+                </SelectTrigger>
+                <SelectContent className="dark:bg-zinc-900 dark:border-zinc-800">
+                  {availableOrders.map(o => (
+                    <SelectItem key={o.id} value={o.id}>
+                      OS #{o.number} — {o.vehicle ? `${o.vehicle.plate} · ${o.vehicle.brand} ${o.vehicle.model}` : o.customer.name}
+                      {o.problem ? ` — ${o.problem.slice(0, 40)}${o.problem.length > 40 ? '…' : ''}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedOrder && (
+                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  ✓ O agendamento será criado já como &quot;OS Gerada&quot; com a OS vinculada.
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">

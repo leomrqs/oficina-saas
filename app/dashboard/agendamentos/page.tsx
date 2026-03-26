@@ -35,11 +35,27 @@ export default async function AgendamentosPage() {
     ]
   });
 
-  const customers = await prisma.customer.findMany({
-    where: { tenantId },
-    select: { id: true, name: true, vehicles: true },
-    orderBy: { name: 'asc' }
-  });
+  const [customers, unlinkedOrders] = await Promise.all([
+    prisma.customer.findMany({
+      where: { tenantId },
+      select: { id: true, name: true, vehicles: true },
+      orderBy: { name: 'asc' }
+    }),
+    // OS que ainda não têm agendamento vinculado
+    prisma.order.findMany({
+      where: { tenantId, appointment: { is: null } },
+      select: {
+        id: true,
+        number: true,
+        status: true,
+        problem: true,
+        customerId: true,
+        customer: { select: { name: true } },
+        vehicle: { select: { plate: true, brand: true, model: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
 
   return (
     <>
@@ -52,9 +68,10 @@ export default async function AgendamentosPage() {
         </div>
       </div>
 
-      <ClientAppointmentManager 
-        appointments={appointments} 
-        customers={customers} 
+      <ClientAppointmentManager
+        appointments={appointments}
+        customers={customers}
+        unlinkedOrders={unlinkedOrders}
       />
     </>
   );

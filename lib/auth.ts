@@ -31,12 +31,28 @@ export const authOptions: AuthOptions = {
           throw new Error("Senha incorreta");
         }
 
+        if (user.role !== "SUPER_ADMIN") {
+          const tenant = await prisma.tenant.findUnique({
+            where: { id: user.tenantId },
+            select: { isActive: true },
+          });
+          if (!tenant?.isActive) {
+            throw new Error("ContaBloqueada");
+          }
+        }
+
+        // Track last login
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date() },
+        });
+
         return {
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role, 
-          tenantId: user.tenantId, 
+          role: user.role,
+          tenantId: user.tenantId,
         };
       },
     }),

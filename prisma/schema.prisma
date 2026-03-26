@@ -57,8 +57,13 @@ model Tenant {
   address         String?  
   logoUrl         String?  
   monthlyGoal     Float    @default(50000.0)
-  billingCycleDay Int      @default(1) // NOVO: Dia de Fechamento do Caixa
-  
+  billingCycleDay Int      @default(1) // Dia de Fechamento do Caixa
+  isActive        Boolean  @default(true)
+  saasPlan        String   @default("Mensal")
+  saasPrice       Float    @default(147.0)
+  saasDueDate     Int      @default(10)
+  expiresAt       DateTime?  // Data de expiração do contrato — auto-bloqueia ao expirar
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -74,6 +79,8 @@ model Tenant {
   employees     Employee[] 
   orderHistory  OrderHistory[]
   appointments  Appointment[] // NOVO: Relação com Agendamentos
+  saasPayments  SaaSPayment[]
+  notes         TenantNote[]
 
   @@map("tenants")
 }
@@ -90,6 +97,7 @@ model User {
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  lastLoginAt DateTime?
 
   @@index([tenantId]) // INDEX DE PERFORMANCE
   @@map("users")
@@ -340,17 +348,38 @@ model FinancialTransaction {
 
 model FixedExpense {
   id        String   @id @default(cuid())
-  title     String   
-  category  String   
+  title     String
+  category  String
   amount    Float
-  dueDay    Int      
+  dueDay    Int
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  expensePayments SaaSExpensePayment[]
+
   @@index([tenantId]) // INDEX DE PERFORMANCE
   @@map("fixed_expenses")
+}
+
+model SaaSExpensePayment {
+  id              String        @id @default(cuid())
+  fixedExpenseId  String?
+  fixedExpense    FixedExpense? @relation(fields: [fixedExpenseId], references: [id], onDelete: SetNull)
+  title           String        @default("") // Snapshot do título (preserva histórico ao deletar custo fixo)
+  category        String        @default("") // Snapshot da categoria
+  month           Int
+  year            Int
+  amount          Float
+  status          String        @default("PENDING") // PENDING, PAID, OVERDUE
+  paidAt          DateTime?
+  createdAt       DateTime      @default(now())
+
+  @@unique([fixedExpenseId, month, year])
+  @@index([fixedExpenseId])
+  @@index([status])
+  @@map("saas_expense_payments")
 }
 
 // ==========================================
@@ -379,7 +408,70 @@ model Appointment {
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
 
-  @@index([tenantId]) 
-  @@index([tenantId, date]) 
+  @@index([tenantId])
+  @@index([tenantId, date])
   @@map("appointments")
+}
+
+// ==========================================
+// MÓDULO SAAS — GESTÃO ADMINISTRATIVA
+// ==========================================
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  actorId   String
+  actorName String   @default("Sistema")
+  metadata  Json?
+  tenantId  String?
+  createdAt DateTime @default(now())
+
+  @@index([actorId])
+  @@index([tenantId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Announcement {
+  id        String    @id @default(cuid())
+  title     String
+  body      String    @db.Text
+  type      String    @default("info") // info, warning, critical
+  isGlobal  Boolean   @default(true)
+  startsAt  DateTime  @default(now())
+  expiresAt DateTime?
+  createdBy String?
+  createdAt DateTime  @default(now())
+
+  @@map("announcements")
+}
+
+model SaaSPayment {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  month     Int
+  year      Int
+  amount    Float
+  status    String    @default("PENDING") // PENDING, PAID, OVERDUE
+  paidAt    DateTime?
+  dueDate   DateTime
+  notes     String?
+  createdAt DateTime  @default(now())
+
+  @@unique([tenantId, month, year])
+  @@index([tenantId])
+  @@index([status])
+  @@map("saas_payments")
+}
+
+model TenantNote {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  content   String   @db.Text
+  createdBy String
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("tenant_notes")
 }

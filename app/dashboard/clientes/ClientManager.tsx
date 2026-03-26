@@ -98,7 +98,9 @@ export function ClientManager({ initialData }: { initialData: Customer[] }) {
       await createCustomer(formData);
       toast.success("Cliente cadastrado com sucesso!");
       setOpenNewClient(false);
-    } catch { toast.error("Erro ao cadastrar cliente."); }
+    } catch (err: any) {
+      toast.error("Erro ao cadastrar cliente.", { description: err?.message });
+    }
   };
 
   const handleUpdateCustomer = async (formData: FormData) => {
@@ -155,6 +157,14 @@ export function ClientManager({ initialData }: { initialData: Customer[] }) {
 
   const formatBRL = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
+  const formatPhone = (phone: string | null): string => {
+    if (!phone) return "—";
+    const d = phone.replace(/\D/g, "");
+    if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+    if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+    return phone;
+  };
+
   const getStatusBadge = (status: string) => {
     switch(status) {
       case "PENDING": return <Badge variant="outline" className="text-yellow-600 border-yellow-200 bg-yellow-50 dark:bg-yellow-500/10 dark:border-yellow-500/20 dark:text-yellow-500">Orçamento</Badge>;
@@ -209,8 +219,8 @@ export function ClientManager({ initialData }: { initialData: Customer[] }) {
                       <Input name="name" required placeholder="Ex: João da Silva" className="bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-800 h-11" />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">WhatsApp</label>
-                      <Input name="phone" placeholder="(11) 99999-9999" className="bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-800 h-11" />
+                      <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">WhatsApp *</label>
+                      <Input name="phone" required placeholder="(11) 99999-9999" className="bg-zinc-50 dark:bg-zinc-950 dark:border-zinc-800 h-11" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">E-mail</label>
@@ -282,32 +292,89 @@ export function ClientManager({ initialData }: { initialData: Customer[] }) {
             <p className="text-zinc-500 font-medium">Nenhum cliente encontrado.</p>
           </div>
         )}
-        
+
         {filteredCustomers.map((customer) => {
           const initials = customer.name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
-          
+          const totalGastoCard = customer.orders.filter(o => o.status === "COMPLETED").reduce((a, c) => a + c.total, 0);
+          const platePreview = customer.vehicles.slice(0, 2).map((v: Vehicle) => v.plate).join(", ");
+
           return (
-            <Card key={customer.id} onClick={() => setSelectedCustomer(customer)} className="flex flex-col transition-all duration-300 hover:-translate-y-1 hover:shadow-md cursor-pointer border-zinc-200 dark:border-zinc-800 dark:bg-zinc-900">
-              <CardHeader className="pb-2 flex flex-row items-start gap-4 space-y-0">
-                <Avatar className="h-10 w-10 border dark:border-zinc-800">
-                  <AvatarFallback className="bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold">{initials}</AvatarFallback>
+            <Card
+              key={customer.id}
+              onClick={() => setSelectedCustomer(customer)}
+              className="flex flex-col transition-all duration-200 hover:-translate-y-1 hover:shadow-lg cursor-pointer border-zinc-200 dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden"
+            >
+              {/* Topo: avatar + nome */}
+              <CardHeader className="pb-3 flex flex-row items-center gap-3 space-y-0">
+                <Avatar className="h-11 w-11 border-2 border-white dark:border-zinc-700 shadow-sm shrink-0">
+                  <AvatarFallback className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-sm font-bold">{initials}</AvatarFallback>
                 </Avatar>
-                <div className="flex-1 overflow-hidden">
-                  <CardTitle className="text-sm font-bold truncate dark:text-zinc-100">{customer.name}</CardTitle>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate mt-0.5">{customer.phone || 'Sem telefone'}</p>
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-sm font-bold truncate dark:text-zinc-100 leading-tight">{customer.name}</CardTitle>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-0.5 flex items-center gap-1">
+                    <Calendar className="w-3 h-3 shrink-0" />
+                    desde {new Date(customer.createdAt).toLocaleDateString('pt-BR')}
+                  </p>
                 </div>
               </CardHeader>
-              <CardContent className="pt-2 flex justify-between items-end">
-                <div className="flex items-center gap-2">
-                  <Car className="w-4 h-4 text-zinc-400 dark:text-zinc-500" />
-                  <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                    {customer.vehicles.length} {customer.vehicles.length === 1 ? 'veículo' : 'veículos'}
+
+              {/* Linha divisória */}
+              <div className="h-px bg-zinc-100 dark:bg-zinc-800 mx-4" />
+
+              {/* Grade de infos */}
+              <CardContent className="pt-3 pb-3 space-y-2">
+
+                {/* Telefone */}
+                <div className="flex items-center gap-2 min-h-[20px]">
+                  <MessageCircle className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <span className={`text-xs truncate ${customer.phone ? 'text-zinc-700 dark:text-zinc-300 font-medium' : 'text-zinc-400 dark:text-zinc-600 italic'}`}>
+                    {customer.phone ? formatPhone(customer.phone) : 'Sem telefone'}
                   </span>
                 </div>
-                <span className="text-[10px] text-zinc-400 font-medium flex items-center gap-1">
-                   <Calendar className="w-3 h-3"/> {new Date(customer.createdAt).toLocaleDateString('pt-BR')}
-                </span>
+
+                {/* Documento */}
+                <div className="flex items-center gap-2 min-h-[20px]">
+                  <FileText className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <span className={`text-xs truncate ${customer.document ? 'text-zinc-700 dark:text-zinc-300' : 'text-zinc-400 dark:text-zinc-600 italic'}`}>
+                    {customer.document || 'Sem CPF/CNPJ'}
+                  </span>
+                </div>
+
+                {/* Cidade/Estado */}
+                <div className="flex items-center gap-2 min-h-[20px]">
+                  <MapPin className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  <span className={`text-xs truncate ${(customer.city || customer.state) ? 'text-zinc-700 dark:text-zinc-300' : 'text-zinc-400 dark:text-zinc-600 italic'}`}>
+                    {customer.city && customer.state
+                      ? `${customer.city} — ${customer.state}`
+                      : customer.city || customer.state || 'Sem endereço'}
+                  </span>
+                </div>
+
+                {/* Veículos */}
+                <div className="flex items-center gap-2 min-h-[20px]">
+                  <Car className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
+                  {customer.vehicles.length === 0 ? (
+                    <span className="text-xs text-zinc-400 dark:text-zinc-600 italic">Sem veículo</span>
+                  ) : (
+                    <span className="text-xs text-zinc-700 dark:text-zinc-300 truncate">
+                      <span className="font-semibold">{customer.vehicles.length}</span>
+                      {customer.vehicles.length === 1 ? ' veículo' : ' veículos'}
+                      {platePreview && <span className="text-zinc-400 dark:text-zinc-500"> · {platePreview}{customer.vehicles.length > 2 ? '…' : ''}</span>}
+                    </span>
+                  )}
+                </div>
               </CardContent>
+
+              {/* Rodapé: OS + gasto total */}
+              <div className="mt-auto border-t border-zinc-100 dark:border-zinc-800 px-4 py-2.5 flex items-center justify-between bg-zinc-50/60 dark:bg-zinc-950/40">
+                <span className="text-[11px] text-zinc-500 flex items-center gap-1">
+                  <Wrench className="w-3 h-3" />
+                  {customer.orders.length} {customer.orders.length === 1 ? 'OS' : 'OS'}
+                </span>
+                <span className={`text-[11px] font-bold ${totalGastoCard > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-400 dark:text-zinc-600 italic font-normal'}`}>
+                  {totalGastoCard > 0 ? formatBRL(totalGastoCard) : 'Sem histórico'}
+                </span>
+              </div>
             </Card>
           );
         })}
@@ -340,7 +407,7 @@ export function ClientManager({ initialData }: { initialData: Customer[] }) {
              <div className="flex flex-wrap gap-2 w-full sm:w-auto">
                {selectedCustomer?.phone && (
                  <Button variant="outline" className="text-green-600 border-green-200 bg-green-50 hover:bg-green-100 dark:bg-green-500/10 dark:border-green-500/20 dark:text-green-500" onClick={() => window.open(getWhatsAppLink(selectedCustomer.phone!), '_blank')}>
-                   <MessageCircle className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">WhatsApp</span>
+                   <MessageCircle className="w-4 h-4 sm:mr-2" /> <span className="hidden sm:inline">{formatPhone(selectedCustomer.phone)}</span>
                  </Button>
                )}
                {selectedCustomer?.email && (

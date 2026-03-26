@@ -1,8 +1,9 @@
 // components/layout/UserMenu.tsx
 "use client";
 
-import { LogOut } from "lucide-react";
+import { LogOut, KeyRound } from "lucide-react";
 import { signOut } from "next-auth/react";
+import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -61,9 +62,16 @@ export function UserMenu({ user }: UserMenuProps) {
         </DropdownMenuGroup>
         
         <DropdownMenuSeparator />
-        
-        <DropdownMenuItem 
-          className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50" 
+
+        <Link href="/dashboard/perfil">
+          <DropdownMenuItem className="cursor-pointer">
+            <KeyRound className="mr-2 h-4 w-4" />
+            <span>Alterar Senha</span>
+          </DropdownMenuItem>
+        </Link>
+
+        <DropdownMenuItem
+          className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
           onClick={() => signOut({ callbackUrl: "/login" })}
         >
           <LogOut className="mr-2 h-4 w-4" />
