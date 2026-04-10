@@ -630,8 +630,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
 
       {/* ── CHARTS ─────────────────────────────────────────────────────────── */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mt-6 animate-in fade-in slide-in-from-bottom-2 duration-500 animation-delay-300">
-        <Card className="col-span-4 transition-all duration-300 hover:shadow-md dark:hover:shadow-zinc-800/50 overflow-hidden">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-7 mt-6 animate-in fade-in slide-in-from-bottom-2 duration-500 animation-delay-300">
+        <Card className="lg:col-span-4 transition-all duration-300 hover:shadow-md dark:hover:shadow-zinc-800/50 overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2 mb-1">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
@@ -644,7 +644,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </CardContent>
         </Card>
 
-        <Card className="col-span-3 transition-all duration-300 hover:shadow-md dark:hover:shadow-zinc-800/50">
+        <Card className="lg:col-span-3 transition-all duration-300 hover:shadow-md dark:hover:shadow-zinc-800/50">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 mb-1">
@@ -672,10 +672,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
 
       {/* ── RECENT ORDERS + PAINEL DE COMPRAS ──────────────────────────────── */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mt-4 mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500 animation-delay-500">
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-7 mt-4 mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500 animation-delay-500">
 
         {/* ── OS DO PERÍODO — Premium ─────────────────────────────────── */}
-        <div className="col-span-4 flex flex-col rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-lg dark:hover:shadow-zinc-900/60 transition-all duration-300 bg-white dark:bg-zinc-900/50">
+        <div className="lg:col-span-4 flex flex-col rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-lg dark:hover:shadow-zinc-900/60 transition-all duration-300 bg-white dark:bg-zinc-900/50">
 
           {/* Card header with gradient top bar */}
           <div className="relative overflow-hidden">
@@ -861,7 +861,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
 
         {/* Painel de Compras */}
-        <Card className={`col-span-3 transition-all duration-300 hover:shadow-md dark:hover:shadow-zinc-800/50 flex flex-col ${
+        <Card className={`lg:col-span-3 transition-all duration-300 hover:shadow-md dark:hover:shadow-zinc-800/50 flex flex-col ${
           topCriticalProducts.length > 0
             ? "border-red-200 dark:border-red-900/40"
             : ""

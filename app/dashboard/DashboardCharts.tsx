@@ -246,65 +246,87 @@ export function FinancialChart({ data }: { data: { name: string; receitas: numbe
 
 // ─── Gráfico de Rosca: Status do Pátio ────────────────────────────────────────
 export function OSStatusChart({ data }: { data: any[] }) {
-  const isDark    = useIsDark();
-  const grid      = isDark ? "#27272a" : "#e4e4e7";
-  const tickColor = "#71717a";
+  const isDark = useIsDark();
+  const grid   = isDark ? "#27272a" : "#e4e4e7";
 
-  const isEmpty = data.every((d) => d.value === 0);
-  const total   = data.reduce((acc, d) => acc + d.value, 0);
+  const isEmpty   = data.every((d) => d.value === 0);
+  const total     = data.reduce((acc, d) => acc + d.value, 0);
   const chartData = isEmpty
     ? [{ name: "Sem Dados", value: 1, fill: grid }]
     : data;
 
+  // Only items with value > 0 in the legend
+  const legendItems = isEmpty ? [] : data.filter((d) => d.value > 0);
+
   return (
-    <div className="relative">
-      <ResponsiveContainer width="100%" height={300}>
-        <PieChart>
-          <Pie
-            data={chartData}
-            cx="50%"
-            cy="44%"
-            innerRadius={72}
-            outerRadius={100}
-            paddingAngle={isEmpty ? 0 : 4}
-            dataKey="value"
-            stroke="none"
-            animationBegin={300}
-            animationDuration={900}
-            animationEasing="ease-out"
-          >
-            {chartData.map((entry, i) => (
-              <Cell key={`cell-${i}`} fill={entry.fill} />
-            ))}
-          </Pie>
+    <div className="flex flex-col gap-3">
+      {/* Donut */}
+      <div className="relative">
+        <ResponsiveContainer width="100%" height={220}>
+          <PieChart>
+            <Pie
+              data={chartData}
+              cx="50%"
+              cy="50%"
+              innerRadius={62}
+              outerRadius={90}
+              paddingAngle={isEmpty ? 0 : 4}
+              dataKey="value"
+              stroke="none"
+              animationBegin={300}
+              animationDuration={900}
+              animationEasing="ease-out"
+            >
+              {chartData.map((entry, i) => (
+                <Cell key={`cell-${i}`} fill={entry.fill} />
+              ))}
+            </Pie>
+            {!isEmpty && (
+              <ChartTooltip
+                isDark={isDark}
+                formatter={(v: number) => [`${v} OS`, ""]}
+              />
+            )}
+          </PieChart>
+        </ResponsiveContainer>
 
-          {!isEmpty && (
-            <ChartTooltip
-              isDark={isDark}
-              formatter={(v: number) => [`${v} OS`, ""]}
-            />
-          )}
+        {/* Center label */}
+        {!isEmpty && (
+          <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+            <span className="text-3xl font-black text-zinc-900 dark:text-zinc-100 tabular-nums leading-none">
+              {total}
+            </span>
+            <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mt-0.5">
+              total OS
+            </span>
+          </div>
+        )}
+      </div>
 
-          <Legend
-            iconType="circle"
-            wrapperStyle={{ fontSize: "11px", color: tickColor }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-
-      {/* Label central da rosca */}
-      {!isEmpty && (
-        <div
-          className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center"
-          style={{ paddingBottom: "36px" }}
-        >
-          <span className="text-2xl font-black text-zinc-900 dark:text-zinc-100 tabular-nums leading-none">
-            {total}
-          </span>
-          <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mt-0.5">
-            total OS
-          </span>
+      {/* Custom legend grid — 2 columns, wraps on any screen */}
+      {legendItems.length > 0 && (
+        <div className="grid grid-cols-2 gap-x-3 gap-y-2 px-1 pb-1">
+          {legendItems.map((item) => (
+            <div key={item.name} className="flex items-center gap-2 min-w-0">
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ backgroundColor: item.fill }}
+              />
+              <span className="text-xs text-zinc-600 dark:text-zinc-400 truncate leading-tight">
+                {item.name}
+              </span>
+              <span className="ml-auto text-xs font-black tabular-nums text-zinc-900 dark:text-zinc-100 shrink-0">
+                {item.value}
+              </span>
+            </div>
+          ))}
         </div>
+      )}
+
+      {isEmpty && (
+        <p className="text-center text-xs text-zinc-400 dark:text-zinc-500 pb-2">
+          Nenhuma OS no período
+        </p>
       )}
     </div>
   );

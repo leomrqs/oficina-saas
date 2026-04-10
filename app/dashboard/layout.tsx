@@ -179,7 +179,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           <div className="w-full flex-1" />
         </header>
 
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-zinc-50/30 dark:bg-zinc-950/50">
+        <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 bg-zinc-50/30 dark:bg-zinc-950/50 pb-[max(2rem,env(safe-area-inset-bottom))] md:pb-6">
           {announcements.length > 0 && announcements.slice(0, 2).map((a) => (
             <div
               key={a.id}
