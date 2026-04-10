@@ -645,148 +645,185 @@ export function ClientAppointmentManager({
         <DialogContent size="md">
           <DialogHeader
             icon={<CalendarDays className="w-5 h-5 text-white" />}
-            iconClass="bg-gradient-to-br from-violet-500 to-violet-700 shadow-violet-600/30 dark:shadow-violet-600/15"
+            iconClass="bg-gradient-to-br from-violet-500 to-violet-700 shadow-violet-600/30"
             title="Agendar Serviço"
             description="Preencha os dados para marcar o serviço"
           />
 
-          <DialogBody className="space-y-5">
-            {/* Conflict warning */}
-            {conflictingAppointment && (
-              <div className="bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900/50 p-4 rounded-xl flex items-start gap-3">
-                <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold text-yellow-900 dark:text-yellow-400 text-sm">Choque de Horário</p>
-                  <p className="text-xs text-yellow-700 dark:text-yellow-500/80 mt-1 leading-relaxed">
-                    Já existe o cliente <b>{conflictingAppointment.customer?.name}</b> agendado para as <b>{formTime}</b>. Tem certeza?
-                  </p>
-                </div>
-              </div>
-            )}
+          <DialogBody>
+            <div className="space-y-4">
 
-            {/* Date / Time */}
-            <div>
-              <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-2.5">Data e Horário</p>
-              <div className="space-y-3">
-                {/* Date: full width */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Data</label>
-                  <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="h-11 w-full text-sm font-bold dark:bg-zinc-900 dark:border-zinc-800 [color-scheme:light] dark:[color-scheme:dark] rounded-xl border-zinc-200" />
-                </div>
-                {/* Start + end time side by side */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Início *</label>
-                    <Input type="time" value={formTime} onChange={(e) => setFormTime(e.target.value)} className="h-11 w-full text-sm font-bold dark:bg-zinc-900 dark:border-zinc-800 [color-scheme:light] dark:[color-scheme:dark] rounded-xl border-zinc-200" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 flex items-center justify-between">
-                      Término <span className="text-[10px] text-zinc-400 font-normal">Opcional</span>
-                    </label>
-                    <Input type="time" value={formEndTime} onChange={(e) => setFormEndTime(e.target.value)} className="h-11 w-full text-sm font-bold dark:bg-zinc-900 dark:border-zinc-800 [color-scheme:light] dark:[color-scheme:dark] rounded-xl border-zinc-200" />
+              {/* Conflict warning */}
+              {conflictingAppointment && (
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900/50">
+                  <AlertTriangle className="w-4 h-4 text-yellow-600 dark:text-yellow-500 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-yellow-900 dark:text-yellow-400">Choque de Horário</p>
+                    <p className="text-xs text-yellow-700 dark:text-yellow-500/80 mt-0.5 leading-relaxed">
+                      <b>{conflictingAppointment.customer?.name}</b> já agendado para as <b>{formTime}</b>.
+                    </p>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Cliente */}
-            <div>
-              <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Cliente e Veículo</p>
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Cliente *</label>
-                  <Select onValueChange={setSelectedCustomer} value={selectedCustomer}>
-                    <SelectTrigger className="h-11 rounded-xl">
-                      {selectedCustomer
-                        ? <span className="flex-1 text-left truncate text-sm font-medium">{customers.find(c => c.id === selectedCustomer)?.name}</span>
-                        : <span className="flex-1 text-left truncate text-sm text-zinc-400 dark:text-zinc-500">Selecione o cliente...</span>}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Veículo</label>
-                  <Select onValueChange={setSelectedVehicle} value={selectedVehicle} disabled={!selectedCustomer || customerVehicles.length === 0}>
-                    <SelectTrigger className="h-11 rounded-xl">
-                      {selectedVehicle
-                        ? (() => { const v = customerVehicles.find((cv: any) => cv.id === selectedVehicle); return v ? <span className="flex-1 text-left truncate text-sm font-medium">{v.plate} — {v.brand} {v.model}</span> : null; })()
-                        : <span className="flex-1 text-left truncate text-sm text-zinc-400 dark:text-zinc-500">{customerVehicles.length > 0 ? "Selecione o veículo..." : "Cliente sem veículo"}</span>}
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customerVehicles.map((v: any) => (
-                        <SelectItem key={v.id} value={v.id}>
-                          <span className="font-mono text-xs font-bold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">{v.plate}</span>
-                          <span className="text-zinc-600 dark:text-zinc-300">{v.brand} {v.model}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            {/* OS vinculada (opcional) */}
-            <div>
-              <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Vínculo com OS <span className="text-zinc-300 dark:text-zinc-600 font-normal normal-case">— Opcional</span></p>
-              <Select onValueChange={handleSelectOrder} value={selectedOrder} disabled={!selectedCustomer}>
-                <SelectTrigger className="h-11 rounded-xl">
-                  {selectedOrder
-                    ? (() => { const o = availableOrders.find(or => or.id === selectedOrder); return o ? <span className="flex-1 text-left truncate text-sm font-medium">OS #{o.number} — {o.vehicle ? `${o.vehicle.plate} · ${o.vehicle.brand} ${o.vehicle.model}` : o.customer.name}</span> : null; })()
-                    : <span className="flex-1 text-left truncate text-sm text-zinc-400 dark:text-zinc-500">
-                        {!selectedCustomer ? "Selecione um cliente primeiro" : availableOrders.length === 0 ? "Nenhuma OS disponível" : "Sem vínculo (agendamento puro)"}
-                      </span>}
-                </SelectTrigger>
-                <SelectContent>
-                  {availableOrders.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      <span className="font-black text-blue-600 dark:text-blue-400">#{o.number}</span>
-                      <span className="text-zinc-500 dark:text-zinc-400">
-                        {o.vehicle ? `${o.vehicle.plate} · ${o.vehicle.brand} ${o.vehicle.model}` : o.customer.name}
-                      </span>
-                      {o.problem && <span className="text-zinc-400 dark:text-zinc-500 truncate max-w-[200px]">— {o.problem.slice(0, 40)}{o.problem.length > 40 ? "…" : ""}</span>}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedOrder && (
-                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 mt-1.5">
-                  <CheckCircle2 className="w-3 h-3" /> O agendamento será criado já como &quot;OS Gerada&quot; com a OS vinculada.
-                </p>
               )}
-            </div>
 
-            {/* Notas */}
-            <div>
-              <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Motivo / Reclamação</p>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ex: Barulho no motor, Revisão dos 50k, Troca de óleo..."
-                className="min-h-[90px] resize-none text-sm dark:bg-zinc-900 dark:border-zinc-800 rounded-xl border-zinc-200"
-              />
+              {/* ── DATA ── */}
+              <div>
+                <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Data e Horário</p>
+                <div className="space-y-2.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">Data</label>
+                    <Input
+                      type="date"
+                      value={formDate}
+                      onChange={(e) => setFormDate(e.target.value)}
+                      className="h-10 w-full text-sm dark:bg-zinc-900 dark:border-zinc-800 [color-scheme:light] dark:[color-scheme:dark] rounded-xl"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">Início *</label>
+                      <Input
+                        type="time"
+                        value={formTime}
+                        onChange={(e) => setFormTime(e.target.value)}
+                        className="h-10 w-full text-sm dark:bg-zinc-900 dark:border-zinc-800 [color-scheme:light] dark:[color-scheme:dark] rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">
+                        Término <span className="font-normal text-zinc-400">opcional</span>
+                      </label>
+                      <Input
+                        type="time"
+                        value={formEndTime}
+                        onChange={(e) => setFormEndTime(e.target.value)}
+                        className="h-10 w-full text-sm dark:bg-zinc-900 dark:border-zinc-800 [color-scheme:light] dark:[color-scheme:dark] rounded-xl"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── CLIENTE E VEÍCULO ── */}
+              <div>
+                <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Cliente e Veículo</p>
+                <div className="space-y-2.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">Cliente *</label>
+                    <Select onValueChange={setSelectedCustomer} value={selectedCustomer}>
+                      <SelectTrigger className="w-full h-10 rounded-xl">
+                        {selectedCustomer
+                          ? <span className="flex-1 min-w-0 text-left truncate text-sm">{customers.find(c => c.id === selectedCustomer)?.name}</span>
+                          : <span className="flex-1 text-left text-sm text-zinc-400 dark:text-zinc-500">Selecione o cliente...</span>}
+                      </SelectTrigger>
+                      <SelectContent>
+                        {customers.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">Veículo</label>
+                    <Select
+                      onValueChange={setSelectedVehicle}
+                      value={selectedVehicle}
+                      disabled={!selectedCustomer || customerVehicles.length === 0}
+                    >
+                      <SelectTrigger className="w-full h-10 rounded-xl">
+                        {selectedVehicle
+                          ? (() => {
+                              const v = customerVehicles.find((cv: any) => cv.id === selectedVehicle);
+                              return v
+                                ? <span className="flex-1 min-w-0 text-left truncate text-sm">{v.plate} — {v.brand} {v.model}</span>
+                                : null;
+                            })()
+                          : <span className="flex-1 text-left text-sm text-zinc-400 dark:text-zinc-500">
+                              {!selectedCustomer ? "Selecione um cliente" : customerVehicles.length > 0 ? "Selecione o veículo..." : "Sem veículo"}
+                            </span>}
+                      </SelectTrigger>
+                      <SelectContent>
+                        {customerVehicles.map((v: any) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            <span className="font-mono text-xs font-bold text-zinc-500 dark:text-zinc-400">{v.plate}</span>
+                            <span className="text-zinc-600 dark:text-zinc-300">{v.brand} {v.model}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── OS VINCULADA ── */}
+              <div>
+                <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-2">
+                  Vínculo com OS <span className="normal-case font-normal text-zinc-300 dark:text-zinc-600">— Opcional</span>
+                </p>
+                <Select onValueChange={handleSelectOrder} value={selectedOrder} disabled={!selectedCustomer}>
+                  <SelectTrigger className="w-full h-10 rounded-xl">
+                    {selectedOrder
+                      ? (() => {
+                          const o = availableOrders.find(or => or.id === selectedOrder);
+                          return o
+                            ? <span className="flex-1 min-w-0 text-left truncate text-sm">
+                                OS #{o.number} — {o.vehicle ? `${o.vehicle.plate} · ${o.vehicle.brand} ${o.vehicle.model}` : o.customer.name}
+                              </span>
+                            : null;
+                        })()
+                      : <span className="flex-1 text-left text-sm text-zinc-400 dark:text-zinc-500">
+                          {!selectedCustomer ? "Selecione um cliente" : availableOrders.length === 0 ? "Sem OS disponível" : "Sem vínculo"}
+                        </span>}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableOrders.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        <span className="font-black text-blue-600 dark:text-blue-400">#{o.number}</span>
+                        <span className="truncate text-zinc-500 dark:text-zinc-400">
+                          {o.vehicle ? `${o.vehicle.plate} · ${o.vehicle.brand} ${o.vehicle.model}` : o.customer.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedOrder && (
+                  <p className="flex items-center gap-1 mt-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                    <CheckCircle2 className="w-3 h-3 shrink-0" />
+                    Agendamento criado como &quot;OS Gerada&quot; com a OS vinculada.
+                  </p>
+                )}
+              </div>
+
+              {/* ── NOTAS ── */}
+              <div>
+                <p className="text-[10px] font-black text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-2">Motivo / Reclamação</p>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Ex: Barulho no motor, revisão dos 50k, troca de óleo..."
+                  className="w-full min-h-[80px] resize-none text-sm dark:bg-zinc-900 dark:border-zinc-800 rounded-xl"
+                />
+              </div>
+
             </div>
           </DialogBody>
 
           <DialogFooter>
+            {/* Cancelar — auto width */}
             <button
               onClick={() => setOpenNewModal(false)}
-              className="h-10 px-4 rounded-xl text-sm font-semibold text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all duration-150 w-full sm:w-auto"
+              className="h-11 px-4 shrink-0 rounded-xl text-sm font-semibold text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors active:scale-[0.97]"
             >
               Cancelar
             </button>
+            {/* Salvar — takes remaining width */}
             <button
               onClick={handleCreate}
               disabled={isSubmitting}
-              className="h-10 px-6 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:pointer-events-none w-full sm:w-auto flex items-center justify-center gap-2"
+              className="h-11 flex-1 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 shadow-md shadow-blue-600/30 transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
             >
-              {isSubmitting ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</>
-              ) : (
-                <>Salvar Agendamento</>
-              )}
+              {isSubmitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Salvando...</> : "Salvar Agendamento"}
             </button>
           </DialogFooter>
         </DialogContent>
